@@ -49,7 +49,8 @@ export async function getFriendsList(
 ): Promise<FriendWithProfile[]> {
   // 실제 Supabase API 호출
   try {
-    const { data: friendships, error } = await supabase
+    // 1. 내가 보낸 친구 요청들 조회
+    const { data: sentRequests, error: sentError } = await supabase
       .from("friendships")
       .select(
         `
@@ -58,16 +59,55 @@ export async function getFriendsList(
             `
       )
       .eq("user_id", userId)
-      .in("status", ["accepted", "pending"]); // accepted와 pending 상태 모두 포함
+      .in("status", ["accepted", "pending"]);
 
-    if (error) throw error;
+    if (sentError) throw sentError;
 
-    // 맞팔 여부 확인 (accepted 상태인 경우만)
+    // 2. 내가 받은 친구 요청들 조회
+    const { data: receivedRequests, error: receivedError } = await supabase
+      .from("friendships")
+      .select(
+        `
+                *,
+                friend_profile:user_id(*)
+            `
+      )
+      .eq("friend_id", userId)
+      .in("status", ["accepted", "pending"]);
+
+    if (receivedError) throw receivedError;
+
+    // 3. 받은 요청의 데이터 구조를 보낸 요청과 맞추기 (friend_profile을 올바른 사용자로 설정)
+    const normalizedReceivedRequests = (receivedRequests || []).map((req) => ({
+      ...req,
+      // 받은 요청의 경우 friend_profile이 실제로는 요청 보낸 사람(user_id)의 정보
+      friend_profile: req.friend_profile,
+      // 표시상 friend_id는 요청 보낸 사람이 되어야 함
+      friend_id: req.user_id,
+      user_id: req.friend_id, // 나(수신자)가 user_id가 됨
+      // 받은 요청임을 표시하기 위한 플래그 추가
+      is_received_request: true,
+    }));
+
+    // 4. 보낸 요청에 플래그 추가
+    const normalizedSentRequests = (sentRequests || []).map((req) => ({
+      ...req,
+      is_received_request: false,
+    }));
+
+    // 5. 두 배열 합치기
+    const allFriendships = [
+      ...normalizedSentRequests,
+      ...normalizedReceivedRequests,
+    ];
+
+    // 6. 맞팔 여부 확인 (accepted 상태인 경우만)
     const friendsWithMutual = await Promise.all(
-      (friendships || []).map(async (friendship) => {
+      allFriendships.map(async (friendship) => {
         let isMutual = false;
-        
+
         if (friendship.status === "accepted") {
+          // 양방향 친구 관계 확인
           const { data: mutualCheck } = await supabase
             .from("friendships")
             .select("id")
@@ -75,7 +115,7 @@ export async function getFriendsList(
             .eq("friend_id", userId)
             .eq("status", "accepted")
             .single();
-          
+
           isMutual = !!mutualCheck;
         }
 
@@ -220,9 +260,7 @@ export async function getFriendshipStatus(
 /**
  * 친구 요청 수락
  */
-export async function acceptFriendRequest(
-  friendshipId: string
-): Promise<void> {
+export async function acceptFriendRequest(friendshipId: string): Promise<void> {
   try {
     const { error } = await supabase
       .from("friendships")
@@ -242,9 +280,7 @@ export async function acceptFriendRequest(
 /**
  * 친구 요청 거절
  */
-export async function rejectFriendRequest(
-  friendshipId: string
-): Promise<void> {
+export async function rejectFriendRequest(friendshipId: string): Promise<void> {
   try {
     const { error } = await supabase
       .from("friendships")

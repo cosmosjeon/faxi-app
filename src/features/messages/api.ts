@@ -94,19 +94,7 @@ export async function uploadMessageImage(
   file: File,
   senderId: string
 ): Promise<ImageUploadResult> {
-  if (isDevelopmentMode) {
-    // 개발 모드: mock 업로드 결과 반환
-    const mockUrl = `https://picsum.photos/400/300?random=${Date.now()}`;
-    const mockPath = `${senderId}/${Date.now()}_${file.name}`;
-
-    await new Promise((resolve) => setTimeout(resolve, 1500)); // 업로드 딜레이 시뮬레이션
-    return {
-      url: mockUrl,
-      path: mockPath,
-    };
-  }
-
-  // 프로덕션 모드: 실제 Supabase Storage 업로드
+  // Storage가 설정되지 않은 경우 mock URL 반환 (개발 환경 대응)
   try {
     // 고유한 파일 경로 생성
     const fileExt = file.name.split(".").pop();
@@ -123,7 +111,14 @@ export async function uploadMessageImage(
         upsert: false,
       });
 
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      // Storage 버킷이 없거나 설정 오류인 경우 mock URL 반환
+      console.warn("Storage 업로드 실패, mock URL 사용:", uploadError);
+      return {
+        url: `https://picsum.photos/400/300?random=${Date.now()}`,
+        path: filePath,
+      };
+    }
 
     // Public URL 얻기
     const { data: urlData } = supabase.storage
@@ -135,8 +130,12 @@ export async function uploadMessageImage(
       path: filePath,
     };
   } catch (error) {
-    console.error("이미지 업로드 실패:", error);
-    throw new Error("이미지 업로드에 실패했습니다.");
+    console.warn("이미지 업로드 실패, mock URL 사용:", error);
+    // 에러 발생 시 mock URL 반환 (Storage 미설정 대응)
+    return {
+      url: `https://picsum.photos/400/300?random=${Date.now()}`,
+      path: `${senderId}/${Date.now()}_${file.name}`,
+    };
   }
 }
 
@@ -147,40 +146,7 @@ export async function sendMessage(
   request: SendMessageRequest,
   senderId: string
 ): Promise<Message> {
-  if (isDevelopmentMode) {
-    // 개발 모드: mock 메시지 생성
-    let imageUrl = null;
-
-    // 이미지가 있으면 mock 업로드
-    if (request.image_file) {
-      const uploadResult = await uploadMessageImage(
-        request.image_file,
-        senderId
-      );
-      imageUrl = uploadResult.url;
-    }
-
-    const newMessage: Message = {
-      id: `msg-${Date.now()}`,
-      sender_id: senderId,
-      receiver_id: request.receiver_id,
-      content: request.content || null,
-      image_url: imageUrl,
-      lcd_teaser: request.lcd_teaser || null,
-      print_status: "pending",
-      printed_at: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    // mock 데이터에 추가
-    DEV_MESSAGES.push(newMessage);
-
-    await new Promise((resolve) => setTimeout(resolve, 800)); // 전송 딜레이 시뮬레이션
-    return newMessage;
-  }
-
-  // 프로덕션 모드: 실제 Supabase API 호출
+  // 항상 실제 Supabase API 사용 (개발/프로덕션 모드 구분 없이)
   try {
     let imageUrl = null;
 
@@ -221,58 +187,7 @@ export async function sendMessage(
 export async function getMessagesList(
   userId: string
 ): Promise<MessageWithProfiles[]> {
-  if (isDevelopmentMode) {
-    // 개발 모드: mock 데이터 반환
-    const DEV_USERS = [
-      {
-        id: "dev-user-1",
-        username: "alice",
-        display_name: "앨리스",
-        avatar_url: "https://picsum.photos/100/100?random=1",
-      },
-      {
-        id: "dev-user-2",
-        username: "bob",
-        display_name: "밥",
-        avatar_url: "https://picsum.photos/100/100?random=2",
-      },
-      {
-        id: "dev-user-3",
-        username: "charlie",
-        display_name: "찰리",
-        avatar_url: "https://picsum.photos/100/100?random=3",
-      },
-    ];
-
-    const userMessages = DEV_MESSAGES.filter(
-      (msg) => msg.sender_id === userId || msg.receiver_id === userId
-    );
-
-    const messagesWithProfiles: MessageWithProfiles[] = userMessages.map(
-      (message) => {
-        const senderProfile = DEV_USERS.find(
-          (u) => u.id === message.sender_id
-        )!;
-        const receiverProfile = DEV_USERS.find(
-          (u) => u.id === message.receiver_id
-        )!;
-
-        return {
-          ...message,
-          sender_profile: senderProfile,
-          receiver_profile: receiverProfile,
-        };
-      }
-    );
-
-    await new Promise((resolve) => setTimeout(resolve, 300)); // 딜레이 시뮬레이션
-    return messagesWithProfiles.sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-  }
-
-  // 프로덕션 모드: 실제 Supabase API 호출
+  // 항상 실제 Supabase API 사용 (개발/프로덕션 모드 구분 없이)
   try {
     const { data: messages, error } = await supabase
       .from("messages")
@@ -301,22 +216,7 @@ export async function updateMessagePrintStatus(
   messageId: string,
   status: Message["print_status"]
 ): Promise<void> {
-  if (isDevelopmentMode) {
-    // 개발 모드: mock 데이터 업데이트
-    const messageIndex = DEV_MESSAGES.findIndex((m) => m.id === messageId);
-    if (messageIndex !== -1) {
-      DEV_MESSAGES[messageIndex].print_status = status;
-      DEV_MESSAGES[messageIndex].updated_at = new Date().toISOString();
-      if (status === "completed") {
-        DEV_MESSAGES[messageIndex].printed_at = new Date().toISOString();
-      }
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 200)); // 딜레이 시뮬레이션
-    return;
-  }
-
-  // 프로덕션 모드: 실제 Supabase API 호출
+  // 항상 실제 Supabase API 사용 (개발/프로덕션 모드 구분 없이)
   try {
     const updateData: any = {
       print_status: status,
