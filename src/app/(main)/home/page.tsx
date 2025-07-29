@@ -93,11 +93,12 @@ export default function HomePage() {
     setIsLoading(true);
     try {
       const messagesList = await getMessagesList(profile.id);
-      // 받은 메시지만 필터링
-      const receivedMessages = messagesList.filter(
-        (msg) => msg.receiver_id === profile.id
+      // 받은 메시지 중 대기중인 메시지만 필터링
+      const pendingReceivedMessages = messagesList.filter(
+        (msg) =>
+          msg.receiver_id === profile.id && msg.print_status === "pending"
       );
-      setMessages(receivedMessages);
+      setMessages(pendingReceivedMessages);
     } catch (error) {
       console.error("메시지 목록 로드 실패:", error);
       toast({
@@ -211,12 +212,8 @@ export default function HomePage() {
       const status = action === "approve" ? "approved" : "failed";
       await updateMessagePrintStatus(messageId, status);
 
-      // 로컬 상태 업데이트
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === messageId ? { ...msg, print_status: status } : msg
-        )
-      );
+      // 로컬 상태에서 해당 메시지 제거 (처리 완료된 메시지는 더 이상 표시하지 않음)
+      setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
 
       if (action === "approve") {
         // 프린트 승인 시 실제 프린터로 전송
@@ -240,6 +237,24 @@ export default function HomePage() {
             }
           } catch (printError) {
             console.error("프린트 작업 추가 실패:", printError);
+
+            // 프린터 연결 실패 시 상태를 다시 pending으로 되돌리기
+            try {
+              await updateMessagePrintStatus(messageId, "pending");
+
+              // 해당 메시지를 다시 목록에 추가 (pending 상태로)
+              const failedMessage = messages.find(
+                (msg) => msg.id === messageId
+              );
+              if (failedMessage) {
+                setMessages((prev) => [
+                  { ...failedMessage, print_status: "pending" },
+                  ...prev,
+                ]);
+              }
+            } catch (statusError) {
+              console.error("메시지 상태 되돌리기 실패:", statusError);
+            }
 
             // 프린터 연결이 안 된 경우에도 UI 피드백 제공
             if (!isAutomatic) {
@@ -488,42 +503,40 @@ export default function HomePage() {
                       )}
                     </div>
 
-                    {/* 액션 버튼 (대기중인 메시지만) */}
-                    {message.print_status === "pending" && (
-                      <div className="flex gap-2 pt-3 border-t">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            handleMessageAction(message.id, "reject")
-                          }
-                          disabled={processingMessages.has(message.id)}
-                          className="flex-1 gap-1"
-                        >
-                          {processingMessages.has(message.id) ? (
-                            <div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <X size={14} />
-                          )}
-                          거절
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() =>
-                            handleMessageAction(message.id, "approve")
-                          }
-                          disabled={processingMessages.has(message.id)}
-                          className="flex-1 gap-1"
-                        >
-                          {processingMessages.has(message.id) ? (
-                            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <Check size={14} />
-                          )}
-                          프린트
-                        </Button>
-                      </div>
-                    )}
+                    {/* 액션 버튼 (모든 메시지가 대기중이므로 항상 표시) */}
+                    <div className="flex gap-2 pt-3 border-t">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          handleMessageAction(message.id, "reject")
+                        }
+                        disabled={processingMessages.has(message.id)}
+                        className="flex-1 gap-1"
+                      >
+                        {processingMessages.has(message.id) ? (
+                          <div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <X size={14} />
+                        )}
+                        거절
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          handleMessageAction(message.id, "approve")
+                        }
+                        disabled={processingMessages.has(message.id)}
+                        className="flex-1 gap-1"
+                      >
+                        {processingMessages.has(message.id) ? (
+                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Check size={14} />
+                        )}
+                        프린트
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>

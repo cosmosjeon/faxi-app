@@ -1,9 +1,6 @@
 ---
-description:
-globs:
-alwaysApply: true
+alwaysApply: false
 ---
-
 # 기술 요구 사항 문서 (TRD)
 
 ## 1. Executive Technical Summary

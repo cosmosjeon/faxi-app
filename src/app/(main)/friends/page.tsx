@@ -16,7 +16,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useAuthStore } from "@/stores/auth.store";
-import { getFriendsList, updateCloseFriend, acceptFriendRequest, rejectFriendRequest } from "@/features/friends/api";
+import {
+  getFriendsList,
+  updateCloseFriend,
+  acceptFriendRequest,
+  rejectFriendRequest,
+} from "@/features/friends/api";
 import type { FriendWithProfile } from "@/features/friends/types";
 import { toast } from "@/hooks/use-toast";
 
@@ -104,10 +109,10 @@ export default function FriendsPage() {
 
     try {
       await acceptFriendRequest(friendshipId);
-      
+
       // 친구 목록 다시 로드
       await loadFriends();
-      
+
       toast({
         title: "친구 요청 수락",
         description: "친구 요청을 수락했습니다.",
@@ -134,10 +139,10 @@ export default function FriendsPage() {
 
     try {
       await rejectFriendRequest(friendshipId);
-      
+
       // 친구 목록 다시 로드
       await loadFriends();
-      
+
       toast({
         title: "친구 요청 거절",
         description: "친구 요청을 거절했습니다.",
@@ -170,12 +175,23 @@ export default function FriendsPage() {
   );
 
   // 상태별로 친구 분류
-  const acceptedFriends = filteredFriends.filter((f) => f.status === "accepted");
+  const acceptedFriends = filteredFriends.filter(
+    (f) => f.status === "accepted"
+  );
   const pendingFriends = filteredFriends.filter((f) => f.status === "pending");
+
+  // 받은 요청과 보낸 요청 분리
+  const receivedRequests = pendingFriends.filter((f) => f.is_received_request);
+  const sentRequests = pendingFriends.filter((f) => !f.is_received_request);
 
   // 상태별 카운트
   const acceptedCount = friends.filter((f) => f.status === "accepted").length;
-  const pendingCount = friends.filter((f) => f.status === "pending").length;
+  const receivedRequestsCount = friends.filter(
+    (f) => f.status === "pending" && f.is_received_request
+  ).length;
+  const sentRequestsCount = friends.filter(
+    (f) => f.status === "pending" && !f.is_received_request
+  ).length;
   const closeFriendsCount = friends.filter(
     (f) => f.is_close_friend && f.status === "accepted"
   ).length;
@@ -189,7 +205,9 @@ export default function FriendsPage() {
             <h1 className="text-2xl font-bold text-gray-900">친구 목록</h1>
             <p className="text-gray-600 mt-1">
               총 {acceptedCount}명 · 친한 친구 {closeFriendsCount}명
-              {pendingCount > 0 && ` · 요청 ${pendingCount}개`}
+              {receivedRequestsCount > 0 &&
+                ` · 받은 요청 ${receivedRequestsCount}개`}
+              {sentRequestsCount > 0 && ` · 보낸 요청 ${sentRequestsCount}개`}
             </p>
           </div>
           <Link href="/friends/add">
@@ -229,150 +247,217 @@ export default function FriendsPage() {
         )}
 
         {/* 친구 목록 */}
-        {!isLoading && (acceptedFriends.length > 0 || pendingFriends.length > 0) && (
-          <div className="space-y-4">
-            {/* 수락된 친구들 */}
-            {acceptedFriends.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users size={20} />내 친구들
-                    {searchQuery && (
-                      <Badge variant="secondary">
-                        {acceptedFriends.length}명 검색됨
-                      </Badge>
-                    )}
-                  </CardTitle>
-                  <CardDescription>
-                    친한 친구로 설정하면 메시지가 자동으로 프린트됩니다
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {acceptedFriends.map((friend) => (
-                    <div
-                      key={friend.id}
-                      className="flex items-center gap-3 p-3 rounded-lg border bg-white hover:bg-gray-50 transition-colors"
-                    >
-                      <Avatar className="h-12 w-12">
-                        <AvatarImage
-                          src={friend.friend_profile.avatar_url || ""}
-                          alt={friend.friend_profile.display_name}
-                        />
-                        <AvatarFallback>
-                          {friend.friend_profile.display_name[0]?.toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-gray-900 truncate">
-                            {friend.friend_profile.display_name}
-                          </h3>
-                          {friend.is_mutual && (
-                            <Badge variant="outline" className="text-xs">
-                              맞팔
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-600">
-                          @{friend.friend_profile.username}
-                        </p>
-                      </div>
-
-                      {/* 친한 친구 토글 */}
-                      <div className="flex items-center gap-2">
-                        <div className="text-right">
-                          <div className="flex items-center gap-1 text-xs text-gray-600 mb-1">
-                            <Heart size={12} />
-                            친한 친구
-                          </div>
-                          <Switch
-                            checked={friend.is_close_friend}
-                            onCheckedChange={(checked) =>
-                              handleCloseFriendToggle(friend.id, checked)
-                            }
-                            disabled={updatingFriendIds.has(friend.id)}
-                            className="scale-75"
+        {!isLoading &&
+          (acceptedFriends.length > 0 ||
+            receivedRequests.length > 0 ||
+            sentRequests.length > 0) && (
+            <div className="space-y-4">
+              {/* 수락된 친구들 */}
+              {acceptedFriends.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users size={20} />내 친구들
+                      {searchQuery && (
+                        <Badge variant="secondary">
+                          {acceptedFriends.length}명 검색됨
+                        </Badge>
+                      )}
+                    </CardTitle>
+                    <CardDescription>
+                      친한 친구로 설정하면 메시지가 자동으로 프린트됩니다
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {acceptedFriends.map((friend) => (
+                      <div
+                        key={friend.id}
+                        className="flex items-center gap-3 p-3 rounded-lg border bg-white hover:bg-gray-50 transition-colors"
+                      >
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage
+                            src={friend.friend_profile.avatar_url || ""}
+                            alt={friend.friend_profile.display_name}
                           />
+                          <AvatarFallback>
+                            {friend.friend_profile.display_name[0]?.toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-gray-900 truncate">
+                              {friend.friend_profile.display_name}
+                            </h3>
+                            {friend.is_mutual && (
+                              <Badge variant="outline" className="text-xs">
+                                맞팔
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600">
+                            @{friend.friend_profile.username}
+                          </p>
                         </div>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
 
-            {/* 대기 중인 친구 요청들 */}
-            {pendingFriends.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <UserPlus size={20} />친구 요청
-                    <Badge variant="secondary">
-                      {pendingFriends.length}개 대기중
-                    </Badge>
-                  </CardTitle>
-                  <CardDescription>
-                    친구 요청을 수락하거나 거절할 수 있습니다
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {pendingFriends.map((friend) => (
-                    <div
-                      key={friend.id}
-                      className="flex items-center gap-3 p-3 rounded-lg border bg-white hover:bg-gray-50 transition-colors"
-                    >
-                      <Avatar className="h-12 w-12">
-                        <AvatarImage
-                          src={friend.friend_profile.avatar_url || ""}
-                          alt={friend.friend_profile.display_name}
-                        />
-                        <AvatarFallback>
-                          {friend.friend_profile.display_name[0]?.toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-
-                      <div className="flex-1 min-w-0">
+                        {/* 친한 친구 토글 */}
                         <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-gray-900 truncate">
-                            {friend.friend_profile.display_name}
-                          </h3>
-                          <Badge variant="secondary" className="text-xs">
-                            대기중
-                          </Badge>
+                          <div className="text-right">
+                            <div className="flex items-center gap-1 text-xs text-gray-600 mb-1">
+                              <Heart size={12} />
+                              친한 친구
+                            </div>
+                            <Switch
+                              checked={friend.is_close_friend}
+                              onCheckedChange={(checked) =>
+                                handleCloseFriendToggle(friend.id, checked)
+                              }
+                              disabled={updatingFriendIds.has(friend.id)}
+                              className="scale-75"
+                            />
+                          </div>
                         </div>
-                        <p className="text-sm text-gray-600">
-                          @{friend.friend_profile.username}
-                        </p>
                       </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
 
-                      {/* 친구 요청 수락/거절 버튼 */}
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => handleAcceptRequest(friend.id)}
-                          disabled={updatingFriendIds.has(friend.id)}
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          수락
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleRejectRequest(friend.id)}
-                          disabled={updatingFriendIds.has(friend.id)}
-                          className="text-red-600 border-red-200 hover:bg-red-50"
-                        >
-                          거절
-                        </Button>
+              {/* 받은 친구 요청들 */}
+              {receivedRequests.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <UserPlus size={20} />
+                      받은 친구 요청
+                      <Badge variant="secondary">
+                        {receivedRequests.length}개
+                      </Badge>
+                    </CardTitle>
+                    <CardDescription>
+                      친구 요청을 수락하거나 거절할 수 있습니다
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {receivedRequests.map((friend) => (
+                      <div
+                        key={friend.id}
+                        className="flex items-center gap-3 p-3 rounded-lg border bg-white hover:bg-gray-50 transition-colors"
+                      >
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage
+                            src={friend.friend_profile.avatar_url || ""}
+                            alt={friend.friend_profile.display_name}
+                          />
+                          <AvatarFallback>
+                            {friend.friend_profile.display_name[0]?.toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-gray-900 truncate">
+                              {friend.friend_profile.display_name}
+                            </h3>
+                            <Badge variant="secondary" className="text-xs">
+                              요청됨
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-600">
+                            @{friend.friend_profile.username}
+                          </p>
+                        </div>
+
+                        {/* 친구 요청 수락/거절 버튼 */}
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleAcceptRequest(friend.id)}
+                            disabled={updatingFriendIds.has(friend.id)}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            수락
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRejectRequest(friend.id)}
+                            disabled={updatingFriendIds.has(friend.id)}
+                            className="text-red-600 border-red-200 hover:bg-red-50"
+                          >
+                            거절
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* 보낸 친구 요청들 */}
+              {sentRequests.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <UserPlus size={20} />
+                      보낸 친구 요청
+                      <Badge variant="outline">
+                        {sentRequests.length}개 대기중
+                      </Badge>
+                    </CardTitle>
+                    <CardDescription>
+                      상대방의 응답을 기다리고 있습니다
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {sentRequests.map((friend) => (
+                      <div
+                        key={friend.id}
+                        className="flex items-center gap-3 p-3 rounded-lg border bg-gray-50 transition-colors"
+                      >
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage
+                            src={friend.friend_profile.avatar_url || ""}
+                            alt={friend.friend_profile.display_name}
+                          />
+                          <AvatarFallback>
+                            {friend.friend_profile.display_name[0]?.toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-gray-700 truncate">
+                              {friend.friend_profile.display_name}
+                            </h3>
+                            <Badge variant="outline" className="text-xs">
+                              대기중
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-500">
+                            @{friend.friend_profile.username}
+                          </p>
+                        </div>
+
+                        {/* 취소 버튼 (선택사항) */}
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleRejectRequest(friend.id)}
+                            disabled={updatingFriendIds.has(friend.id)}
+                            className="text-gray-500 hover:text-red-600"
+                          >
+                            취소
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
 
         {/* 검색 결과 없음 */}
         {!isLoading &&
