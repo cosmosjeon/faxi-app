@@ -8,26 +8,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useAuthStore, DEV_USERS } from "@/stores/auth.store";
-import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/stores/auth.store";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signInWithOAuth, signInAsDev, isLoading, user, isDevelopmentMode } =
-    useAuthStore();
+  const searchParams = useSearchParams();
+  const { signInWithOAuth, isLoading, user } = useAuthStore();
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isKakaoLoading, setIsKakaoLoading] = useState(false);
-  const [isDevLoading, setIsDevLoading] = useState(false);
-  const [selectedDevUser, setSelectedDevUser] = useState<string>("");
 
   // 이미 로그인된 사용자는 홈으로 리디렉션
   useEffect(() => {
@@ -35,6 +26,43 @@ export default function LoginPage() {
       router.push("/");
     }
   }, [user, router]);
+
+  // URL 파라미터에서 오류 메시지 확인
+  useEffect(() => {
+    const error = searchParams.get("error");
+    const details = searchParams.get("details");
+
+    if (error) {
+      let errorMessage = "로그인 중 오류가 발생했습니다.";
+      
+      switch (error) {
+        case "oauth_error":
+          errorMessage = "소셜 로그인 중 오류가 발생했습니다.";
+          break;
+        case "session_exchange_failed":
+          errorMessage = "인증 세션 처리 중 오류가 발생했습니다.";
+          break;
+        case "exchange_exception":
+          errorMessage = "인증 처리 중 예외가 발생했습니다.";
+          break;
+        case "no_code":
+          errorMessage = "인증 코드를 받지 못했습니다.";
+          break;
+        default:
+          errorMessage = `로그인 오류: ${error}`;
+      }
+
+      if (details) {
+        errorMessage += ` (${details})`;
+      }
+
+      toast({
+        title: "로그인 실패",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  }, [searchParams]);
 
   const handleGoogleLogin = async () => {
     setIsGoogleLoading(true);
@@ -65,36 +93,6 @@ export default function LoginPage() {
       });
     } finally {
       setIsKakaoLoading(false);
-    }
-  };
-
-  // ✅ 개발용 로그인 핸들러
-  const handleDevLogin = async () => {
-    if (!selectedDevUser) {
-      toast({
-        title: "사용자 선택 필요",
-        description: "개발용 사용자를 선택해주세요.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsDevLoading(true);
-    try {
-      await signInAsDev(selectedDevUser);
-      toast({
-        title: "개발용 로그인 성공",
-        description: "테스트 계정으로 로그인되었습니다.",
-      });
-    } catch (error) {
-      console.error("개발용 로그인 실패:", error);
-      toast({
-        title: "로그인 실패",
-        description: "개발용 로그인 중 오류가 발생했습니다.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDevLoading(false);
     }
   };
 
@@ -168,47 +166,6 @@ export default function LoginPage() {
               </div>
             )}
           </Button>
-
-          {/* ✅ 개발용 로그인 섹션 - 개발 모드에서만 표시 */}
-          {isDevelopmentMode && (
-            <div className="border-t pt-4 mt-6">
-              <div className="text-center text-sm text-gray-600 mb-3">
-                🧪 개발용 로그인
-              </div>
-              <div className="space-y-3">
-                <Select
-                  value={selectedDevUser}
-                  onValueChange={setSelectedDevUser}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="테스트 사용자 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DEV_USERS.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.display_name} (@{user.username})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Button
-                  onClick={handleDevLogin}
-                  disabled={isLoading || isDevLoading || !selectedDevUser}
-                  className="w-full h-10 bg-green-600 hover:bg-green-700 text-white"
-                >
-                  {isDevLoading ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>로그인 중...</span>
-                    </div>
-                  ) : (
-                    "개발용 로그인"
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
 
           <div className="text-center text-sm text-gray-500 mt-6">
             로그인하면 Studio Pensieve의{" "}

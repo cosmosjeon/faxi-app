@@ -13,6 +13,7 @@ import {
   Image as ImageIcon,
   Printer,
   Bell,
+  LogOut,
 } from "lucide-react";
 import {
   Card,
@@ -49,7 +50,7 @@ import { messageToasts } from "@/lib/toasts";
 
 export default function HomePage() {
   const router = useRouter();
-  const { profile, isDevelopmentMode } = useAuthStore();
+  const { profile, signOut } = useAuthStore();
   const printer = useBlePrinter();
   const [messages, setMessages] = useState<MessageWithProfiles[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -65,6 +66,25 @@ export default function HomePage() {
     isOpen: false,
     message: null,
   });
+
+  // 로그아웃 핸들러
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      router.push("/login");
+      toast({
+        title: "로그아웃 완료",
+        description: "성공적으로 로그아웃되었습니다.",
+      });
+    } catch (error) {
+      console.error("로그아웃 실패:", error);
+      toast({
+        title: "로그아웃 실패",
+        description: "로그아웃 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // 메시지 목록 로드
   const loadMessages = async () => {
@@ -139,7 +159,7 @@ export default function HomePage() {
 
   // Supabase Realtime 구독
   useEffect(() => {
-    if (!profile || isDevelopmentMode) return; // 개발 모드에서는 Realtime 구독 안 함
+    if (!profile) return; // 개발 모드에서는 Realtime 구독 안 함
 
     console.log("🔄 Supabase Realtime 구독 시작");
 
@@ -177,7 +197,7 @@ export default function HomePage() {
       console.log("🔄 Supabase Realtime 구독 해제");
       supabase.removeChannel(channel);
     };
-  }, [profile, isDevelopmentMode]);
+  }, [profile]);
 
   // 메시지 승인/거절 핸들러
   const handleMessageAction = async (
@@ -339,70 +359,33 @@ export default function HomePage() {
     (msg) => msg.print_status === "pending"
   ).length;
 
-  // 개발 모드 테스트 시뮬레이션 함수
-  const simulateNewMessage = async (type: "general" | "close") => {
-    if (!profile) {
-      toast({
-        title: "로그인 필요",
-        description: "로그인 후 테스트할 수 있습니다.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const senderId =
-      type === "general" ? "test_general_user" : "test_close_friend";
-    const senderProfile = {
-      id: senderId,
-      username: `${type}_user`,
-      display_name: type === "general" ? "일반 친구" : "친한 친구",
-      avatar_url: null,
-    };
-
-    const newMessage: MessageWithProfiles = {
-      id: `simulated_${Date.now()}`,
-      sender_id: senderId,
-      receiver_id: profile.id,
-      content: `${
-        type === "general" ? "일반 친구" : "친한 친구"
-      }가 보낸 테스트 메시지입니다!`,
-      image_url: null,
-      lcd_teaser: `${type === "general" ? "일반" : "친한"} 테스트`,
-      print_status: "pending",
-      printed_at: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      sender_profile: senderProfile,
-      receiver_profile: {
-        id: profile.id,
-        username: profile.username,
-        display_name: profile.display_name,
-        avatar_url: profile.avatar_url,
-      },
-    };
-
-    console.log(`🎭 시뮬레이션: ${type} 친구 메시지 생성`);
-    await handleNewMessage(newMessage);
-  };
-
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-md mx-auto space-y-4">
         {/* 헤더 */}
         <div className="bg-white rounded-lg p-4 shadow-sm">
-          <h1 className="text-2xl font-bold text-gray-900">
-            안녕하세요, {profile?.display_name || "사용자"}님! 👋
-          </h1>
-          <p className="text-gray-600 mt-1">
-            {pendingCount > 0
-              ? `${pendingCount}개의 새로운 메시지가 있습니다`
-              : "새로운 메시지를 확인해보세요"}
-          </p>
-          {isDevelopmentMode && (
-            <div className="mt-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-              🧪 개발 모드: 실시간 알림 비활성화
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                안녕하세요, {profile?.display_name || "사용자"}님! 👋
+              </h1>
+              <p className="text-gray-600 mt-1">
+                {pendingCount > 0
+                  ? `${pendingCount}개의 새로운 메시지가 있습니다`
+                  : "새로운 메시지를 확인해보세요"}
+              </p>
             </div>
-          )}
+            {profile && (
+              <Button
+                variant="ghost"
+                onClick={handleLogout}
+                className="text-red-600 hover:text-red-700"
+              >
+                <LogOut size={18} />
+                로그아웃
+              </Button>
+            )}
+          </div>
 
           {/* 프린터 상태 표시 */}
           <div className="mt-3 flex items-center gap-2 text-sm">
@@ -441,37 +424,6 @@ export default function HomePage() {
             )}
           </div>
         </div>
-
-        {/* 개발 모드 테스트 버튼 */}
-        {isDevelopmentMode && (
-          <Card className="border-dashed border-2 border-yellow-300 bg-yellow-50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-yellow-800">
-                🧪 개발 테스트
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => simulateNewMessage("general")}
-                  className="flex-1 text-xs"
-                >
-                  일반 친구 메시지
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => simulateNewMessage("close")}
-                  className="flex-1 text-xs"
-                >
-                  친한 친구 메시지
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* 받은 메시지 피드 */}
         <Card>
