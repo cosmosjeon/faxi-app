@@ -1,0 +1,135 @@
+-- ########## FAXI MVP Schema ##########
+
+-- 1. Extensions & Helper Functions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- 2. users Table
+CREATE TABLE IF NOT EXISTS public.users (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    display_name VARCHAR(100) NOT NULL,
+    avatar_url TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view all profiles" ON public.users FOR SELECT USING (true);
+CREATE POLICY "Users can update own profile" ON public.users FOR UPDATE USING (auth.uid() = id);
+
+-- 3. user_settings Table
+CREATE TABLE IF NOT EXISTS public.user_settings (
+    user_id UUID PRIMARY KEY REFERENCES public.users(id) ON DELETE CASCADE,
+    auto_print_close_friends BOOLEAN DEFAULT false,
+    retro_effects_enabled BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TRIGGER update_user_settings_updated_at BEFORE UPDATE ON public.user_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+ALTER TABLE public.user_settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage own settings" ON public.user_settings FOR ALL USING (auth.uid() = user_id);
+
+-- 4. friendships Table
+CREATE TYPE friendship_status AS ENUM ('pending', 'accepted', 'blocked');
+CREATE TABLE IF NOT EXISTS public.friendships (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    friend_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    is_close_friend BOOLEAN DEFAULT false,
+    status friendship_status DEFAULT 'pending',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_friendship UNIQUE (user_id, friend_id),
+    CONSTRAINT no_self_friendship CHECK (user_id != friend_id)
+);
+CREATE TRIGGER update_friendships_updated_at BEFORE UPDATE ON public.friendships FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+ALTER TABLE public.friendships ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage own friendships" ON public.friendships FOR ALL USING (auth.uid() IN (user_id, friend_id));
+
+-- 5. messages Table
+CREATE TYPE print_status AS ENUM ('pending', 'approved', 'completed', 'failed');
+CREATE TABLE IF NOT EXISTS public.messages (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    sender_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    receiver_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    content TEXT,
+    image_url TEXT,
+    lcd_teaser VARCHAR(10),
+    print_status print_status DEFAULT 'pending',
+    printed_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT content_or_image CHECK (content IS NOT NULL OR image_url IS NOT NULL)
+);
+CREATE TRIGGER update_messages_updated_at BEFORE UPDATE ON public.messages FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view own messages" ON public.messages FOR SELECT USING (auth.uid() IN (sender_id, receiver_id));
+CREATE POLICY "Users can send messages" ON public.messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
+CREATE POLICY "Users can update received messages" ON public.messages FOR UPDATE USING (auth.uid() = receiver_id);
+
+-- 6. printer_connections Table
+CREATE TABLE IF NOT EXISTS public.printer_connections (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    device_id VARCHAR(100) NOT NULL,
+    device_name VARCHAR(100),
+    last_connected_at TIMESTAMP WITH TIME ZONE,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TRIGGER update_printer_connections_updated_at BEFORE UPDATE ON public.printer_connections FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Create partial unique index for active printers (instead of constraint)
+CREATE UNIQUE INDEX unique_active_printer_per_user ON public.printer_connections (user_id) WHERE (is_active = true);
+
+ALTER TABLE public.printer_connections ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage own printers" ON public.printer_connections FOR ALL USING (auth.uid() = user_id);
+
+-- 7. DB Triggers
+-- Trigger for Realtime notifications
+CREATE OR REPLACE FUNCTION notify_new_message()
+RETURNS TRIGGER AS $$
+BEGIN
+    PERFORM pg_notify('new_message', json_build_object('receiver_id', NEW.receiver_id, 'message_id', NEW.id)::text);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER on_new_message AFTER INSERT ON public.messages FOR EACH ROW EXECUTE FUNCTION notify_new_message();
+
+-- Trigger for auto-approval (linked with user_settings)
+CREATE OR REPLACE FUNCTION auto_approve_message()
+RETURNS TRIGGER AS $$
+DECLARE
+  should_auto_print BOOLEAN;
+BEGIN
+  -- 1. Check if the receiver has auto-print enabled
+  SELECT auto_print_close_friends INTO should_auto_print
+  FROM public.user_settings WHERE user_id = NEW.receiver_id;
+
+  -- 2. If enabled, check if the sender is a close friend
+  IF should_auto_print AND EXISTS (
+      SELECT 1 FROM public.friendships
+      WHERE user_id = NEW.receiver_id 
+      AND friend_id = NEW.sender_id
+      AND is_close_friend = true
+      AND status = 'accepted'
+  ) THEN
+      NEW.print_status = 'approved';
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER check_auto_approve BEFORE INSERT ON public.messages FOR EACH ROW EXECUTE FUNCTION auto_approve_message(); 

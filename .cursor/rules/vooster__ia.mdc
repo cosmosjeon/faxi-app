@@ -1,0 +1,195 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+# Studio Pensieve Information Architecture (IA)
+
+## 1. Site Map (사이트맵)
+```
+Studio Pensieve App
+├── Authentication (인증)
+│   ├── Social Login (소셜 로그인)
+│   │   ├── Google Login
+│   │   ├── Apple Login
+│   │   └── Kakao Login
+│   └── Onboarding (온보딩)
+├── Main App (메인 앱)
+│   ├── Home (홈) - 받은 메시지 피드
+│   ├── Friends (친구)
+│   │   ├── Friend List (친구 목록)
+│   │   ├── Add Friend (친구 추가)
+│   │   └── Friend Management (친구 관리)
+│   ├── Send Message (메시지 전송)
+│   │   ├── Text + Photo Composer
+│   │   └── Teaser Message Input
+│   ├── Printer (프린터)
+│   │   ├── BLE Connection (BLE 연결)
+│   │   ├── Printer Status (프린터 상태)
+│   │   └── Personal Photo Print (개인 사진 인쇄)
+│   └── Profile (프로필)
+│       ├── Settings (설정)
+│       ├── Account Management (계정 관리)
+│       └── App Info (앱 정보)
+```
+
+## 2. User Flow (사용자 흐름)
+
+### 핵심 태스크 1: 친구와 실시간 감성 소통
+1. 사용자가 Send Message (+) 탭 선택
+2. 텍스트 입력 (최대 200자) + 이미지 첨부 (선택)
+3. LCD 티저 메시지 입력 (10자 이내)
+4. 받을 친구 선택
+5. 전송 버튼 클릭
+6. 서버 저장 및 수신자에게 Push 알림 발송
+7. **친한 친구**: 자동 프린트 실행
+8. **일반 친구**: 수신 알림 → 사용자 승인 → 프린트 실행
+
+### 핵심 태스크 2: 프린터 연동 및 개인 프린트
+1. Printer 탭 선택
+2. BLE 연결 상태 확인
+3. 연결되지 않은 경우: "프린터 연결" 버튼 클릭 → BLE 페어링
+4. 연결 성공 후: "내 사진 프린트" 선택
+5. 카메라 롤에서 사진 선택
+6. 간단 편집 (크롭, 회전, 문구 삽입)
+7. "프린트" 버튼 클릭 → 즉시 출력
+
+### 핵심 태스크 3: 친구 관리
+1. Friends 탭 선택
+2. "친구 추가" 버튼 클릭
+3. ID 검색으로 친구 찾기
+4. 친구 요청 전송 → 맞팔 확인
+5. 친구 목록에서 "친한 친구" 토글 설정 (자동 프린트 활성화)
+
+## 3. Navigation Structure (네비게이션 구조)
+
+### Bottom Tab Bar (하단 탭바) - Instagram 방식
+- **위치**: 화면 하단 고정
+- **구성**: 5개 탭 (홈, 친구, 전송, 프린터, 프로필)
+- **디자인**: 90년대 레트로 감성, LCD 그린 (#00FF41) 액티브 상태
+- **접근성**: 모바일 엄지손가락 최적화 영역
+
+**탭 구성:**
+1. **Home (🏠)**: 받은 메시지 피드, 실시간 알림
+2. **Friends (👥)**: 친구 목록, 친구 추가, 관리
+3. **Send (+)**: 메시지/사진 전송 (메인 액션, 중앙 강조)
+4. **Printer (🖨️)**: BLE 연결, 개인 프린트, 상태 확인
+5. **Profile (⚙️)**: 설정, 계정 관리
+
+## 4. Page Hierarchy (페이지 계층 구조)
+
+```
+/ (Depth 1) - 앱 루트
+├── /auth (Depth 1) - 인증
+│   ├── /auth/social-login (Depth 2)
+│   └── /auth/onboarding (Depth 2)
+├── /home (Depth 1) - 홈 피드
+├── /friends (Depth 1) - 친구
+│   ├── /friends/list (Depth 2)
+│   ├── /friends/add (Depth 2)
+│   └── /friends/manage/:friendId (Depth 2)
+├── /send (Depth 1) - 메시지 전송
+│   └── /send/compose (Depth 2)
+├── /printer (Depth 1) - 프린터
+│   ├── /printer/connect (Depth 2)
+│   ├── /printer/status (Depth 2)
+│   └── /printer/photo-print (Depth 2)
+└── /profile (Depth 1) - 프로필
+    ├── /profile/settings (Depth 2)
+    └── /profile/account (Depth 2)
+```
+
+## 5. Content Organization (콘텐츠 구성)
+
+| Page | Key Content Elements | Priority |
+|---|---|---|
+| Home | 받은 메시지 카드, 새 메시지 알림, 프린트 상태 표시 | High |
+| Friends | 친구 목록, 검색바, 친한친구 토글, 친구 추가 버튼 | High |
+| Send Message | 텍스트 입력창, 이미지 첨부, 티저 입력, 친구 선택 | High |
+| Printer | BLE 연결 상태, 프린터 정보, 개인 사진 프린트 버튼 | High |
+| Profile | 사용자 정보, 설정 메뉴, 자동 프린트 옵션 | Medium |
+| Friend Add | ID 검색창, 검색 결과, 친구 요청 버튼 | Medium |
+| Photo Print | 사진 선택, 편집 도구 (크롭/회전), 문구 입력 | Medium |
+
+## 6. Interaction Patterns (인터랙션 패턴)
+
+### 메시지 관련
+- **메시지 카드**: 탭하면 상세 보기, 스와이프로 승인/거절
+- **프린트 승인**: 모달 팝업으로 "프린트할까요?" 확인
+- **실시간 알림**: 토스트 메시지로 새 메시지 도착 알림
+
+### 프린터 관련
+- **BLE 연결**: 로딩 스피너 + 연결 상태 실시간 업데이트
+- **프린트 진행**: 프로그레스 바로 출력 상태 표시
+- **오류 처리**: 재시도 버튼과 함께 명확한 오류 메시지
+
+### 친구 관리
+- **친한 친구 토글**: 즉시 반영, LCD 그린으로 활성 상태 표시
+- **친구 검색**: 실시간 검색 결과, 디바운싱 적용
+
+### 레트로 감성 요소
+- **스캔라인 효과**: 설정에서 On/Off 가능
+- **LCD 스타일 텍스트**: 중요 상태 메시지에 적용
+- **90년대 사운드**: 프린트 완료 시 레트로 알림음
+
+## 7. URL Structure (URL 구조)
+
+PWA 기반으로 SEO 친화적이고 직관적인 URL 구조:
+
+```
+- 일반: https://studiopensieve.com/[resource]
+- 상세: https://studiopensieve.com/[resource]/[id]
+- 액션: https://studiopensieve.com/[resource]/[action]
+
+예시:
+- https://studiopensieve.com/home
+- https://studiopensieve.com/friends
+- https://studiopensieve.com/friends/add
+- https://studiopensieve.com/send
+- https://studiopensieve.com/printer
+- https://studiopensieve.com/printer/connect
+- https://studiopensieve.com/profile
+```
+
+## 8. Component Hierarchy (컴포넌트 계층 구조)
+
+### Global Components (전역 컴포넌트)
+- **BottomTabBar**: 메인 네비게이션
+- **Header**: 페이지 제목, 뒤로가기 버튼
+- **StatusBar**: 프린터 연결 상태, 네트워크 상태
+- **Toast**: 실시간 알림 메시지
+- **Modal**: 확인 팝업, 설정 모달
+
+### Page-Specific Components (페이지별 컴포넌트)
+
+#### Home Page
+- **MessageCard**: 받은 메시지 표시 카드
+- **NotificationBanner**: 새 메시지 알림
+- **EmptyState**: 메시지가 없을 때 상태
+
+#### Friends Page
+- **FriendListItem**: 친구 정보 + 친한친구 토글
+- **SearchBar**: 친구 검색 입력창
+- **AddFriendButton**: 친구 추가 플로팅 버튼
+
+#### Send Message Page
+- **MessageComposer**: 텍스트 + 이미지 작성 영역
+- **TeaserInput**: LCD 티저 메시지 입력
+- **FriendSelector**: 받을 친구 선택 컴포넌트
+
+#### Printer Page
+- **ConnectionStatus**: BLE 연결 상태 표시
+- **PrinterInfo**: 프린터 모델, 배터리 정보
+- **PhotoPrintButton**: 개인 사진 프린트 진입점
+- **PrintQueue**: 프린트 대기열 상태
+
+#### Profile Page
+- **UserProfile**: 사용자 정보 표시
+- **SettingsMenu**: 설정 옵션 리스트
+- **RetroToggle**: 레트로 효과 On/Off 스위치
+
+### Responsive Design Considerations
+- **Mobile First**: 320px ~ 428px 기본 대응
+- **Tablet 대응**: 768px 이상에서 2컬럼 레이아웃
+- **Component Scaling**: 화면 크기에 따른 컴포넌트 크기 자동 조정
+- **Touch Target**: 최소 44px 터치 영역 보장

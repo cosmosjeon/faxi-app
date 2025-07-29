@@ -1,0 +1,35 @@
+---
+alwaysApply: true
+---
+MVP Focus and Overengineering Prevention Cursor Rule
+1. MVP-First Development Principle
+Implement only the features/code strictly necessary to meet the core requirements of the product’s MVP.
+
+Do not add features, abstractions, or generalizations beyond clearly requested and defined scope.
+
+Solve only the problems that are needed right now; prioritize simplicity over future extensibility or reusability.
+
+2. Prohibition of Overengineering
+Avoid complex designs, excessive abstractions, or unnecessary generalizations (unneeded interfaces, extension structures, etc.).
+
+Do not prepare for requirements that are not currently necessary (apply the YAGNI principle: You Aren’t Gonna Need It).
+
+Treat code as a liability, not an asset. Minimize the amount of written code.
+
+3. Emphasis on Iteration and Feedback Cycles
+After completing the core functionality, expand and refactor only after receiving real feedback and new requirements.
+
+Aim for the cycle: small incremental development → fast validation → expansion as necessary.
+
+4. Code Review and Collaboration Guidelines
+Reviewers must always verify: “Is this implementation strictly necessary to solve the current problem?” and “Is there unnecessary complexity?”
+
+Remove abstractions or extensions not actively used or required.
+
+Explicitly check and document “MVP focus” and “no overengineering” in documentation and commits.
+
+“Make it work first, then make it better, if needed—and only then.”
+“Don’t waste time doing it ‘generic and reusable’ if you don’t need to.”
+“Write less code. Treat code as a liability rather than an asset.”
+
+This principle must be the highest-level rule in all cursor rules and development processes, and all team members must acknowledge and agree to it.

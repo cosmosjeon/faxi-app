@@ -1,0 +1,506 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+
+# Studio Pensieve: Code Guideline Document
+
+## 1. Project Overview
+
+Studio Pensieve is an offline social media platform combining a Next.js-based Progressive Web App (PWA) with a small thermal printer connected via Bluetooth Low Energy (BLE). The technical approach prioritizes rapid MVP delivery by leveraging proven, high-productivity technologies. Supabase serves as the Backend as a Service (BaaS) to minimize backend development, while the client communicates directly with the printer via the Web Bluetooth API. This architecture is optimized for swift market validation.
+
+**Key Architectural Decisions:**
+*   **Next.js (App Router) PWA:** For high productivity, performance optimization via server components, and easy Vercel deployment.
+*   **Supabase:** Integrated BaaS for authentication, database (PostgreSQL), storage, and real-time features, reducing backend overhead.
+*   **Web Bluetooth API:** Direct BLE communication from the PWA, enabling printer control without native app development (Android/desktop only for MVP).
+*   **Tailwind CSS & shadcn/ui:** For rapid UI development and consistent design.
+*   **Zustand:** Lightweight state management for efficient handling of complex state logic.
+
+## 2. Core Principles
+
+*   **Readability:** Code MUST be easily understood by any team member, minimizing cognitive load.
+*   **Maintainability:** Code MUST be structured for easy modification, debugging, and extension over time.
+*   **Performance:** Code MUST be optimized to meet specified performance non-functional requirements.
+*   **Modularity:** Code MUST be broken down into small, independent, and reusable units.
+*   **Reliability:** Code MUST handle errors gracefully and ensure stable operation, especially for BLE.
+
+## 3. Language-Specific Guidelines
+
+### 3.1 File Organization and Directory Structure
+
+**MUST Follow:**
+*   Organize code by business domain (e.g., `messages`, `users`, `printer`).
+*   Within domains, separate concerns into `api.ts` (data fetching), `types.ts` (type definitions), and `components/` (UI).
+*   Place shared components in `components/ui` and domain-specific components in `components/domain`.
+*   Use `src/` as the root for all source code.
+
+```
+// MUST: Domain-driven organization
+src/
+├── app/
+│   ├── (main)/
+│   │   ├── messages/
+│   │   │   ├── page.tsx
+│   │   │   └── components/
+│   │   │       ├── MessageCard.tsx
+│   │   │       └── MessageComposer.tsx
+│   │   └── layout.tsx
+├── components/
+│   ├── domain/
+│   │   ├── messages/
+│   │   │   └── MessageCard.tsx
+│   │   └── printer/
+│   │       └── PrinterStatusIndicator.tsx
+│   └── ui/
+│       ├── button.tsx
+│       └── dialog.tsx
+├── domain/
+│   ├── messages/
+│   │   ├── api.ts
+│   │   └── types.ts
+│   ├── users/
+│   │   ├── api.ts
+│   │   └── types.ts
+│   └── printer/
+│       ├── service.ts // BLE service logic
+│       └── types.ts
+├── hooks/
+│   ├── useBlePrinter.ts
+│   └── useAuthSession.ts
+├── lib/
+│   ├── supabase/
+│   │   ├── client.ts
+│   │   └── server.ts
+│   └── utils.ts
+```
+
+**MUST NOT Do:**
+*   Create monolithic files containing unrelated logic.
+*   Mix UI components, API calls, and type definitions in a single file unless trivial.
+
+```
+// MUST NOT: Monolithic file
+// src/components/MessageList.tsx
+// This file contains UI, API calls, and types.
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase/client';
+
+type Message = { id: string; content: string; };
+
+async function fetchMessages() { /* ... */ }
+
+export default function MessageList() { /* ... */ }
+```
+
+### 3.2 Import/Dependency Management
+
+**MUST Follow:**
+*   Use absolute imports for internal modules starting from `@/`.
+*   Group imports: React/Next.js, external libraries, internal modules, relative imports.
+*   Maintain alphabetical order within each group.
+
+```typescript
+// MUST: Organized and absolute imports
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+
+import { Button } from '@/components/ui/button';
+import { fetchMessages } from '@/domain/messages/api';
+import { Message } from '@/domain/messages/types';
+
+import { cn } from '@/lib/utils';
+```
+
+**MUST NOT Do:**
+*   Use excessive relative imports (e.g., `../../../`).
+*   Mix import types or have unorganized import lists.
+
+```typescript
+// MUST NOT: Disorganized and relative imports
+import { useRouter } from 'next/router';
+import { cn } from '../../lib/utils';
+import { fetchMessages } from '../../domain/messages/api';
+import React, { useState, useEffect } from 'react';
+```
+
+### 3.3 Error Handling Patterns
+
+**MUST Follow:**
+*   Use `try-catch` blocks for asynchronous operations that can fail (API calls, BLE operations).
+*   Provide user-friendly error messages.
+*   Log errors using Sentry for monitoring and debugging.
+*   For BLE, implement specific error codes and retry mechanisms as per PRD.
+
+```typescript
+// MUST: Robust error handling for async operations
+import * as Sentry from '@sentry/nextjs';
+
+async function sendMessage(message: string) {
+  try {
+    const { data, error } = await supabase.from('messages').insert({ content: message });
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Failed to send message:', error);
+    Sentry.captureException(error);
+    throw new Error('Could not send message. Please try again.'); // User-friendly error
+  }
+}
+
+// MUST: BLE specific error handling with retries
+async function connectToPrinter() {
+  try {
+    // ... BLE connection logic
+    if (connectionFailed) {
+      throw new Error('BLE_CONNECTION_FAILED'); // Specific error code
+    }
+    return true;
+  } catch (error) {
+    if (error.message === 'BLE_CONNECTION_FAILED') {
+      // Implement retry logic
+      console.warn('BLE connection failed, retrying...');
+      // await retryConnect();
+    }
+    Sentry.captureException(error);
+    throw new Error('Failed to connect to printer.');
+  }
+}
+```
+
+**MUST NOT Do:**
+*   Swallow errors without logging or informing the user.
+*   Use generic `alert()` for errors.
+
+```typescript
+// MUST NOT: Swallowing errors
+async function fetchUserData() {
+  try {
+    const { data } = await supabase.from('users').select('*');
+    return data;
+  } catch (error) {
+    // Error is ignored
+  }
+}
+```
+
+## 4. Code Style Rules
+
+### 4.1 MUST Follow:
+
+*   **Consistent Naming Conventions:**
+    *   Variables: `camelCase` (e.g., `userName`, `messageContent`).
+    *   Functions: `camelCase` (e.g., `getUserProfile`, `sendMessage`).
+    *   Components: `PascalCase` (e.g., `UserProfile`, `MessageCard`).
+    *   Constants: `SCREAMING_SNAKE_CASE` (e.g., `MAX_MESSAGE_LENGTH`).
+    *   Types/Interfaces: `PascalCase` (e.g., `UserType`, `IMessage`).
+    *   Rationale: Enhances readability and predictability.
+
+*   **Strict TypeScript Usage:**
+    *   Explicitly define types for function arguments, return values, and complex state.
+    *   Use interfaces for object shapes, types for unions/aliases.
+    *   Rationale: Improves code quality, enables better tooling, and reduces runtime errors.
+
+    ```typescript
+    // MUST: Explicit TypeScript types
+    interface User {
+      id: string;
+      name: string;
+      email: string;
+    }
+
+    function getUserById(id: string): User | null {
+      // ...
+      return { id: '1', name: 'John Doe', email: 'john@example.com' };
+    }
+    ```
+
+*   **Functional Components and Hooks:**
+    *   Prefer functional components over class components.
+    *   Use React Hooks for state management and side effects.
+    *   Rationale: Simpler, more readable, and better performance in many cases.
+
+*   **Destructuring Props:**
+    *   Destructure props at the component's function signature.
+    *   Rationale: Improves readability and makes it clear which props are used.
+
+    ```typescript
+    // MUST: Destructure props
+    interface MessageCardProps {
+      message: { id: string; content: string; sender: string; };
+      onDelete: (id: string) => void;
+    }
+
+    function MessageCard({ message, onDelete }: MessageCardProps) {
+      return (
+        <div>
+          <p>{message.content}</p>
+          <button onClick={() => onDelete(message.id)}>Delete</button>
+        </div>
+      );
+    }
+    ```
+
+*   **Early Returns / Guard Clauses:**
+    *   Handle edge cases or invalid conditions at the beginning of a function using early returns.
+    *   Rationale: Reduces nesting and improves readability by keeping the main logic flat.
+
+    ```typescript
+    // MUST: Early return
+    function processMessage(message: string | null): string {
+      if (!message) {
+        return 'No message provided.';
+      }
+      if (message.length > MAX_MESSAGE_LENGTH) {
+        return 'Message too long.';
+      }
+      // ... main logic
+      return 'Message processed.';
+    }
+    ```
+
+### 4.2 MUST NOT Do:
+
+*   **Avoid Any-type:**
+    *   Do not use `any` unless absolutely necessary (e.g., for third-party libraries without type definitions).
+    *   Rationale: Defeats the purpose of TypeScript and hides potential bugs.
+
+    ```typescript
+    // MUST NOT: Use 'any'
+    function processData(data: any) {
+      // ...
+    }
+    ```
+
+*   **Avoid Deep Nesting:**
+    *   Keep component and function nesting to a minimum. Refactor complex logic into smaller functions or components.
+    *   Rationale: Deep nesting reduces readability and makes code harder to maintain.
+
+    ```typescript
+    // MUST NOT: Deeply nested JSX
+    function UserProfile({ user, posts, comments }) {
+      return (
+        <div>
+          {user && (
+            <div>
+              <h1>{user.name}</h1>
+              {posts && posts.length > 0 ? (
+                <ul>
+                  {posts.map(post => (
+                    <li key={post.id}>
+                      {post.title}
+                      {comments && comments.length > 0 && (
+                        <div>
+                          {comments.map(comment => (
+                            <p key={comment.id}>{comment.text}</p>
+                          ))}
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>No posts.</p>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+    ```
+
+*   **Avoid Complex State Management in Single Components:**
+    *   Do not manage overly complex or global state within a single component's `useState`. Use Zustand for shared or complex application state.
+    *   Rationale: Leads to prop drilling, re-renders, and makes debugging difficult.
+
+*   **No Magic Strings/Numbers:**
+    *   Define all string literals and numbers that are not self-explanatory as constants.
+    *   Rationale: Improves maintainability, prevents typos, and makes code easier to understand.
+
+    ```typescript
+    // MUST NOT: Magic string
+    function checkStatus(status: string) {
+      if (status === 'pending') { /* ... */ }
+    }
+
+    // MUST: Use constants
+    const STATUS_PENDING = 'pending';
+    function checkStatus(status: string) {
+      if (status === STATUS_PENDING) { /* ... */ }
+    }
+    ```
+
+## 5. Architecture Patterns
+
+### 5.1 Component/Module Structure Guidelines
+
+**MUST Follow:**
+*   **Atomic Design Principles (Optional but Recommended):** Consider structuring components from atoms (buttons, inputs) to molecules (forms, cards) to organisms (headers, footers) and templates/pages.
+*   **Single Responsibility Principle:** Each component or module MUST have one clear responsibility.
+*   **Prop Drilling Mitigation:** Use Zustand for global state or `React.Context` for local, deeply nested state to avoid excessive prop drilling.
+
+```typescript
+// MUST: Single Responsibility Component
+// components/domain/messages/MessageCard.tsx
+interface MessageCardProps {
+  message: { id: string; content: string; sender: string; };
+  onDelete: (id: string) => void;
+}
+
+export function MessageCard({ message, onDelete }: MessageCardProps) {
+  return (
+    <div className="p-4 border rounded-lg">
+      <p className="font-semibold">{message.sender}</p>
+      <p>{message.content}</p>
+      <button onClick={() => onDelete(message.id)} className="text-red-500">Delete</button>
+    </div>
+  );
+}
+```
+
+**MUST NOT Do:**
+*   Create components that handle multiple unrelated functionalities (e.g., a `UserAndMessageListAndPrinterStatus` component).
+
+### 5.2 Data Flow Patterns
+
+**MUST Follow:**
+*   **Unidirectional Data Flow:** Data flows down from parent components to children via props. Events flow up from children to parents via callbacks.
+*   **Server Components for Data Fetching:** Leverage Next.js Server Components for initial data fetching where possible to improve performance.
+*   **Client Components for Interactivity:** Use Client Components for interactive UI and real-time updates.
+*   **Supabase Client for Client-Side Data:** Use `@/lib/supabase/client` for client-side interactions with Supabase (e.g., user actions, real-time subscriptions).
+
+```typescript
+// MUST: Server Component for initial data fetch
+// app/(main)/messages/page.tsx
+import { MessageCard } from '@/components/domain/messages/MessageCard';
+import { getMessages } from '@/domain/messages/api'; // Server-side API call
+
+export default async function MessagesPage() {
+  const messages = await getMessages(); // Fetched on the server
+
+  return (
+    <div className="space-y-4">
+      {messages.map(message => (
+        <MessageCard key={message.id} message={message} onDelete={() => { /* ... */ }} />
+      ))}
+    </div>
+  );
+}
+```
+
+```typescript
+// MUST: Client Component with client-side data interaction
+// components/domain/messages/MessageComposer.tsx
+'use client'; // Marks as Client Component
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { sendMessage } from '@/domain/messages/api'; // Client-side API call
+
+export function MessageComposer() {
+  const [content, setContent] = useState('');
+
+  const handleSubmit = async () => {
+    await sendMessage(content);
+    setContent('');
+  };
+
+  return (
+    <div className="flex gap-2">
+      <input value={content} onChange={(e) => setContent(e.target.value)} className="flex-grow" />
+      <Button onClick={handleSubmit}>Send</Button>
+    </div>
+  );
+}
+```
+
+**MUST NOT Do:**
+*   Perform heavy data fetching directly within deeply nested client components without proper caching or state management.
+
+### 5.3 State Management Conventions
+
+**MUST Follow:**
+*   **Local State (useState):** For component-specific UI state that doesn't need to be shared.
+*   **Zustand:** For global application state that needs to be shared across multiple components or managed centrally (e.g., user session, BLE connection status, message queue).
+*   **Server State (React Query / SWR):** Consider using a dedicated library (e.g., TanStack Query, though not explicitly in TRD, it's a good practice for server state management) for caching, revalidation, and synchronization of data fetched from Supabase. If not, manage carefully with `useEffect` and `useState`.
+*   **Supabase Realtime:** For real-time updates (e.g., new messages), subscribe directly using Supabase's Realtime API.
+
+```typescript
+// MUST: Zustand for global state
+// hooks/useBlePrinter.ts
+import { create } from 'zustand';
+import { connectPrinter, disconnectPrinter, printMessage } from '@/domain/printer/service'; // BLE service
+
+interface PrinterState {
+  isConnected: boolean;
+  isPrinting: boolean;
+  error: string | null;
+  connect: () => Promise<void>;
+  disconnect: () => Promise<void>;
+  print: (data: string) => Promise<void>;
+}
+
+export const useBlePrinter = create<PrinterState>((set) => ({
+  isConnected: false,
+  isPrinting: false,
+  error: null,
+  connect: async () => {
+    set({ error: null });
+    try {
+      set({ isConnected: await connectPrinter() });
+    } catch (e: any) {
+      set({ error: e.message });
+    }
+  },
+  disconnect: async () => {
+    await disconnectPrinter();
+    set({ isConnected: false });
+  },
+  print: async (data: string) => {
+    set({ isPrinting: true, error: null });
+    try {
+      await printMessage(data);
+    } catch (e: any) {
+      set({ error: e.message });
+    } finally {
+      set({ isPrinting: false });
+    }
+  },
+}));
+```
+
+**MUST NOT Do:**
+*   Prop-drill state through many layers of components.
+*   Use `useState` for state that needs to be globally accessible or frequently updated across the application.
+
+### 5.4 API Design Standards
+
+**MUST Follow:**
+*   **RESTful Principles for Supabase Interactions:**
+    *   Use appropriate HTTP methods (GET, POST, PUT, DELETE) for CRUD operations.
+    *   Define clear, resource-oriented endpoints.
+*   **Clear Function Signatures:**
+    *   API functions (e.g., in `domain/messages/api.ts`) MUST have explicit input types and return types.
+    *   Rationale: Improves clarity and type safety.
+
+```typescript
+// MUST: Clear API function signature
+// domain/messages/api.ts
+import { supabase } from '@/lib/supabase/client';
+import { Message, NewMessage } from './types'; // Defined types
+
+export async function getMessages(): Promise<Message[]> {
+  const { data, error } = await supabase.from('messages').select('*');
+  if (error) throw error;
+  return data;
+}
+
+export async function createMessage(newMessage: NewMessage): Promise<Message> {
+  const { data, error } = await supabase.from('messages').insert(newMessage).single();
+  if (error) throw error;
+  return data;
+}
+```
+
+**MUST NOT Do:**
+*   Use generic API functions that handle multiple resource types.
+*   Return raw Supabase response objects directly to components; abstract them into defined types.
