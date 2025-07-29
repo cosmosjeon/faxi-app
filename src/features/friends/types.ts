@@ -31,6 +31,7 @@ export interface FriendWithProfile {
   updated_at: string;
   friend_profile: UserProfile;
   is_mutual: boolean; // 맞팔 여부
+  is_received_request: boolean; // 받은 요청인지 여부
 }
 
 // 친구 검색 결과 타입
