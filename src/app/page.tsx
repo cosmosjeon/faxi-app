@@ -6,29 +6,42 @@ import { useEffect } from "react";
 
 export default function HomePage() {
   const router = useRouter();
-  const { user, isInitialized, isLoading } = useAuthStore();
+  const { user, profile, isInitialized, isLoading } = useAuthStore();
 
   useEffect(() => {
-    if (!isInitialized || isLoading) return;
-
-    // 인증된 사용자는 홈으로, 미인증 사용자는 로그인 페이지로
-    if (user) {
-      router.push("/home");
-    } else {
-      router.push("/login");
+    // 초기화가 완료되지 않았거나 로딩 중이면 대기
+    if (!isInitialized || isLoading) {
+      return;
     }
-  }, [user, isInitialized, isLoading, router]);
 
+    // 로그인되지 않은 사용자는 로그인 페이지로
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
+    // 프로필이 없는 사용자는 온보딩 페이지로
+    if (!profile) {
+      router.push("/onboarding");
+      return;
+    }
+
+    // 프로필이 있는 사용자는 홈 페이지로
+    router.push("/home");
+  }, [user, profile, isInitialized, isLoading, router]);
+
+  // 로딩 중이거나 초기화 중이면 로딩 화면 표시
   if (!isInitialized || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
-          <span className="text-gray-600">로딩 중...</span>
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">로딩 중...</p>
         </div>
       </div>
     );
   }
 
-  return null; // 리디렉션 중
+  // 리디렉션 중이면 빈 화면 표시
+  return null;
 }

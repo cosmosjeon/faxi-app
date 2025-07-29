@@ -1,7 +1,5 @@
 ---
-description:
-globs:
-alwaysApply: true
+alwaysApply: false
 ---
 # 제품 요구 사항 문서 (PRD) - MVP 버전
 

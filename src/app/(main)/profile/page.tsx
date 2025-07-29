@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -12,15 +13,27 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuthStore } from "@/stores/auth.store";
 import { Settings, LogOut, User, Bell, Shield, HelpCircle } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 export default function ProfilePage() {
-  const { profile, signOut, isDevelopmentMode } = useAuthStore();
+  const router = useRouter();
+  const { profile, signOut } = useAuthStore();
 
   const handleSignOut = async () => {
     try {
       await signOut();
+      router.push("/login");
+      toast({
+        title: "로그아웃 완료",
+        description: "성공적으로 로그아웃되었습니다.",
+      });
     } catch (error) {
       console.error("로그아웃 실패:", error);
+      toast({
+        title: "로그아웃 실패",
+        description: "로그아웃 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -50,11 +63,6 @@ export default function ProfilePage() {
                 <p className="text-gray-600">
                   @{profile?.username || "username"}
                 </p>
-                {isDevelopmentMode && (
-                  <Badge variant="secondary" className="mt-1">
-                    🧪 개발 모드
-                  </Badge>
-                )}
               </div>
               <Button variant="outline" size="sm">
                 <User size={16} />
@@ -111,7 +119,7 @@ export default function ProfilePage() {
           onClick={handleSignOut}
         >
           <LogOut size={16} />
-          {isDevelopmentMode ? "개발용 로그아웃" : "로그아웃"}
+          로그아웃
         </Button>
       </div>
     </div>
