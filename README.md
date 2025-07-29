@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 이 프로젝트는 [`EasyNext`](https://github.com/easynext/easynext)를 사용해 생성된 [Next.js](https://nextjs.org) 프로젝트입니다.
 
 ## Getting Started
@@ -90,3 +91,7 @@ easynext sentry
 # Google Adsense
 easynext adsense
 ```
+=======
+# faxi-app
+faxi-app develop
+>>>>>>> 720a81eaf027172f994ac296c187bbca305bd261
