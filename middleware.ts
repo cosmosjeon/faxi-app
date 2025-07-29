@@ -41,7 +41,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // 보호된 라우트 정의
-  const protectedRoutes = ["/friends", "/messages", "/settings", "/profile"];
+  const protectedRoutes = ["/friends", "/messages", "/settings", "/profile", "/home"];
   const authRoutes = ["/login"];
 
   const isProtectedRoute = protectedRoutes.some((route) =>
