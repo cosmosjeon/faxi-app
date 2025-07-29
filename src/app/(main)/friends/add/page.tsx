@@ -16,7 +16,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuthStore } from "@/stores/auth.store";
-import { searchUserByUsername, addFriend } from "@/features/friends/api";
+import { searchUserByUsername, addFriend, getFriendshipStatus } from "@/features/friends/api";
 import type { SearchResult } from "@/features/friends/types";
 import { toast } from "@/hooks/use-toast";
 import { friendToasts } from "@/lib/toasts";
@@ -44,7 +44,25 @@ export default function AddFriendPage() {
       const filteredResults = results.filter(
         (result) => result.user.id !== profile?.id
       );
-      setSearchResults(filteredResults);
+
+      // 각 사용자의 친구 관계 상태 확인
+      const resultsWithStatus = await Promise.all(
+        filteredResults.map(async (result) => {
+          if (!profile) return result;
+          
+          const friendshipStatus = await getFriendshipStatus(
+            profile.id,
+            result.user.id
+          );
+          
+          return {
+            ...result,
+            friendship_status: friendshipStatus,
+          };
+        })
+      );
+
+      setSearchResults(resultsWithStatus);
     } catch (error) {
       console.error("검색 실패:", error);
       toast({
