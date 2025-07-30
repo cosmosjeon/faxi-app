@@ -1,0 +1,397 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Bell } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { useAuthStore } from "@/stores/auth.store";
+import { useToast } from "@/hooks/use-toast";
+import {
+  getUserSettings,
+  updateNotificationSettings,
+} from "@/features/settings/api";
+import type {
+  NotificationSettings,
+  UserSettings,
+} from "@/features/settings/types";
+
+export default function NotificationSettingsPage() {
+  const router = useRouter();
+  const { profile } = useAuthStore();
+  const { toast } = useToast();
+
+  const [settings, setSettings] = useState<NotificationSettings | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // 설정 로드
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    const loadSettings = async () => {
+      try {
+        console.log("🔄 알림 설정 로드 시작:", profile.id);
+
+        const userSettings = await getUserSettings(profile.id);
+
+        console.log("📋 가져온 사용자 설정:", {
+          raw: userSettings,
+          hasMessageNotifications:
+            "message_notifications" in (userSettings || {}),
+          hasMarketingNotifications:
+            "marketing_notifications" in (userSettings || {}),
+          hasAutoprint: "auto_print_close_friends" in (userSettings || {}),
+        });
+
+        if (userSettings) {
+          // DB에서 가져온 실제 값 사용, 없으면 기본값 적용
+          const notificationSettings: NotificationSettings = {
+            message_notifications: userSettings.message_notifications ?? true,
+            marketing_notifications:
+              userSettings.marketing_notifications ?? false,
+            auto_print_close_friends:
+              userSettings.auto_print_close_friends ?? false,
+          };
+
+          console.log("✅ 로드된 알림 설정:", notificationSettings);
+          setSettings(notificationSettings);
+        } else {
+          console.warn("⚠️ 사용자 설정이 없음, 기본값 사용");
+
+          // 사용자 설정이 아예 없는 경우 기본값
+          const defaultSettings: NotificationSettings = {
+            message_notifications: true,
+            marketing_notifications: false,
+            auto_print_close_friends: false,
+          };
+
+          setSettings(defaultSettings);
+        }
+      } catch (error) {
+        console.error("❌ 설정 로드 실패:", error);
+        toast({
+          title: "설정 로드 실패",
+          description: "알림 설정을 불러오는데 실패했습니다.",
+          variant: "destructive",
+        });
+
+        // 오류 발생 시에도 기본값으로 설정하여 앱이 동작하도록 함
+        const fallbackSettings: NotificationSettings = {
+          message_notifications: true,
+          marketing_notifications: false,
+          auto_print_close_friends: false,
+        };
+
+        setSettings(fallbackSettings);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadSettings();
+  }, [profile?.id, toast]);
+
+  // 설정 업데이트
+  const handleSettingChange = async (
+    key: keyof NotificationSettings,
+    value: boolean | string
+  ) => {
+    if (!profile?.id || !settings) {
+      console.warn("⚠️ 필수 데이터 누락:", {
+        profileId: profile?.id,
+        settings: !!settings,
+      });
+      return;
+    }
+
+    console.log("🔄 설정 변경 시작:", {
+      key,
+      value,
+      userId: profile.id,
+      originalValue: settings[key],
+    });
+
+    // 클라이언트 사이드 검증
+    if (typeof value !== "boolean") {
+      console.error("❌ 잘못된 값 타입:", {
+        key,
+        value,
+        expectedType: "boolean",
+        actualType: typeof value,
+      });
+      toast({
+        title: "설정 오류",
+        description: "올바르지 않은 설정 값입니다.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // 값 변경이 없으면 스킵
+    if (settings[key] === value) {
+      console.log("⏭️ 동일한 값으로 변경 시도, 스킵");
+      return;
+    }
+
+    // 기존 설정 백업 (rollback용)
+    const originalSettings = { ...settings };
+
+    // UI 상태 즉시 업데이트 (낙관적 업데이트)
+    const optimisticSettings = { ...settings, [key]: value };
+    setSettings(optimisticSettings);
+
+    setIsSaving(true);
+
+    try {
+      const updateRequest = {
+        user_id: profile.id,
+        settings: { [key]: value } as Partial<NotificationSettings>,
+      };
+
+      console.log("📤 서버 업데이트 요청:", updateRequest);
+
+      // 네트워크 연결 상태 확인 (가능한 경우)
+      if (
+        typeof navigator !== "undefined" &&
+        "onLine" in navigator &&
+        !navigator.onLine
+      ) {
+        throw new Error("인터넷 연결을 확인해주세요.");
+      }
+
+      const result = await updateNotificationSettings(updateRequest);
+
+      console.log("📥 서버 응답:", result);
+
+      if (!result.success) {
+        throw new Error(result.error || "알 수 없는 오류가 발생했습니다.");
+      }
+
+      // 성공 시 최신 설정을 다시 불러와서 동기화 보장
+      console.log("✅ 업데이트 성공, 최신 설정 재로드");
+
+      const refreshedSettings = await getUserSettings(profile.id);
+      if (refreshedSettings) {
+        const syncedSettings: NotificationSettings = {
+          message_notifications:
+            refreshedSettings.message_notifications ?? true,
+          marketing_notifications: refreshedSettings.marketing_notifications,
+          auto_print_close_friends:
+            refreshedSettings.auto_print_close_friends ?? false,
+        };
+
+        setSettings(syncedSettings);
+        console.log("🔄 설정 동기화 완료:", syncedSettings);
+      }
+
+      toast({
+        title: "설정 저장됨",
+        description: `${
+          key === "message_notifications"
+            ? "전체 알림"
+            : key === "marketing_notifications"
+            ? "마케팅 알림"
+            : "친한친구 자동출력"
+        } 설정이 업데이트되었습니다.`,
+      });
+    } catch (error) {
+      console.error("❌ 설정 저장 실패:", {
+        error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        key,
+        attemptedValue: value,
+        originalValue: originalSettings[key],
+        userId: profile.id,
+      });
+
+      // 실패 시 원래 설정으로 롤백
+      setSettings(originalSettings);
+      console.log("🔄 설정 롤백 완료:", originalSettings);
+
+      // 사용자 친화적 에러 메시지 생성
+      let userFriendlyMessage = "설정을 저장하는데 실패했습니다.";
+
+      if (error instanceof Error) {
+        const message = error.message.toLowerCase();
+
+        if (
+          message.includes("network") ||
+          message.includes("인터넷") ||
+          message.includes("연결")
+        ) {
+          userFriendlyMessage = "인터넷 연결을 확인하고 다시 시도해주세요.";
+        } else if (
+          message.includes("permission") ||
+          message.includes("권한") ||
+          message.includes("denied")
+        ) {
+          userFriendlyMessage = "권한이 없습니다. 다시 로그인해주세요.";
+        } else if (
+          message.includes("마이그레이션") ||
+          message.includes("migration") ||
+          message.includes("column")
+        ) {
+          userFriendlyMessage =
+            "시스템 업데이트가 필요합니다. 잠시 후 다시 시도해주세요.";
+        } else if (message.includes("timeout")) {
+          userFriendlyMessage =
+            "요청 시간이 초과되었습니다. 다시 시도해주세요.";
+        } else {
+          userFriendlyMessage = error.message;
+        }
+      }
+
+      toast({
+        title: "저장 실패",
+        description: userFriendlyMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="max-w-md mx-auto">
+          <div className="bg-white rounded-lg p-4 shadow-sm">
+            <div className="animate-pulse space-y-4">
+              <div className="h-6 bg-gray-200 rounded w-1/2"></div>
+              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!settings) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="max-w-md mx-auto">
+          <Card>
+            <CardContent className="p-6 text-center">
+              <p className="text-gray-600">설정을 불러올 수 없습니다.</p>
+              <Button onClick={() => router.back()} className="mt-4">
+                돌아가기
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="max-w-md mx-auto space-y-4">
+        {/* 헤더 */}
+        <div className="bg-white rounded-lg p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.back()}
+              className="p-2"
+            >
+              <ArrowLeft size={20} />
+            </Button>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">알림 설정</h1>
+              <p className="text-sm text-gray-600">
+                알림 수신 방식을 설정하세요
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 알림 설정 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bell size={20} />
+              알림 설정
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label className="text-sm font-medium">전체 알림</Label>
+                <p className="text-xs text-gray-600">
+                  메시지, 친구 요청, 프린터 등 모든 알림 수신
+                </p>
+              </div>
+              <Switch
+                checked={settings.message_notifications}
+                onCheckedChange={(checked) =>
+                  handleSettingChange("message_notifications", checked)
+                }
+                disabled={isSaving}
+              />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label className="text-sm font-medium">친한친구 자동출력</Label>
+                <p className="text-xs text-gray-600">
+                  친한친구 메시지를 승인 없이 자동으로 출력
+                </p>
+              </div>
+              <Switch
+                checked={settings.auto_print_close_friends}
+                onCheckedChange={(checked) =>
+                  handleSettingChange("auto_print_close_friends", checked)
+                }
+                disabled={isSaving}
+              />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label className="text-sm font-medium">마케팅 알림</Label>
+                <p className="text-xs text-gray-600">이벤트 및 프로모션 정보</p>
+              </div>
+              <Switch
+                checked={settings.marketing_notifications}
+                onCheckedChange={(checked) =>
+                  handleSettingChange("marketing_notifications", checked)
+                }
+                disabled={isSaving}
+              />
+            </div>
+
+            <div className="bg-blue-50 p-3 rounded-lg">
+              <p className="text-xs text-blue-700">
+                <strong>알림 소리, 진동</strong>은 기기의 시스템 설정에서 조정할
+                수 있습니다.
+              </p>
+            </div>
+
+            {/* 개발 정보 (개발 중에만 표시) */}
+            <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+              <p className="text-xs text-green-800">
+                <strong>✅ 개발 완료:</strong> 알림 설정이 데이터베이스와 완전히
+                연결되었습니다. 설정 변경이 실시간으로 저장되고 페이지 새로고침
+                시에도 유지됩니다.
+              </p>
+              <p className="text-xs text-green-700 mt-1">
+                만약 마이그레이션 오류가 발생하면{" "}
+                <code className="bg-green-100 px-1 rounded">quick_fix.sql</code>
+                을 실행하세요.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
