@@ -12,7 +12,15 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuthStore } from "@/stores/auth.store";
-import { Settings, LogOut, User, Bell, Shield, HelpCircle } from "lucide-react";
+import {
+  Settings,
+  LogOut,
+  User,
+  Bell,
+  Shield,
+  HelpCircle,
+  ExternalLink,
+} from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export default function ProfilePage() {
@@ -80,17 +88,42 @@ export default function ProfilePage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button variant="ghost" className="w-full justify-start gap-3">
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3"
+              onClick={() => router.push("/profile/notifications")}
+            >
               <Bell size={16} />
               알림 설정
             </Button>
-            <Button variant="ghost" className="w-full justify-start gap-3">
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3"
+              onClick={() => router.push("/profile/privacy")}
+            >
               <Shield size={16} />
               개인정보 설정
             </Button>
-            <Button variant="ghost" className="w-full justify-start gap-3">
-              <HelpCircle size={16} />
-              도움말
+            <Button
+              variant="ghost"
+              className="w-full justify-between gap-3"
+              onClick={() =>
+                window.open(
+                  "https://skku-spec.notion.site/240aeeb6b64880fda8d7f3fe671cf068?source=copy_link",
+                  "_blank"
+                )
+              }
+            >
+              <div className="flex items-center gap-3">
+                <HelpCircle size={16} />
+                <div className="text-left">
+                  <div>도움말</div>
+                  <div className="text-xs text-gray-500">
+                    FAXI 홈페이지로 이동
+                  </div>
+                </div>
+              </div>
+              <ExternalLink size={14} className="text-gray-400" />
             </Button>
           </CardContent>
         </Card>
