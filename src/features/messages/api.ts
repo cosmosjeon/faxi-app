@@ -238,3 +238,99 @@ export async function updateMessagePrintStatus(
     throw new Error("메시지 상태 업데이트에 실패했습니다.");
   }
 }
+
+/**
+ * 대기 중인 메시지 목록 조회 (친한친구 자동 프린트용)
+ */
+export async function getQueuedMessages(userId: string): Promise<
+  {
+    id: string;
+    sender_id: string;
+    receiver_id: string;
+    content: string | null;
+    image_url: string | null;
+    lcd_teaser: string | null;
+    print_status: "queued";
+    created_at: string;
+    sender_display_name: string;
+    sender_avatar_url: string | null;
+  }[]
+> {
+  try {
+    console.log("🔍 대기 중인 메시지 조회 시작:", { userId });
+
+    // 먼저 RPC 함수 사용 시도
+    const { data: rpcData, error: rpcError } = await supabase.rpc(
+      "get_queued_messages_for_user",
+      {
+        user_id_param: userId,
+      }
+    );
+
+    console.log("📊 RPC 응답:", { data: rpcData, error: rpcError });
+
+    if (!rpcError) {
+      return rpcData || [];
+    }
+
+    console.warn("⚠️ RPC 실패, 직접 쿼리로 대체:", rpcError);
+
+    // RPC 실패 시 직접 쿼리 사용
+    const { data: directData, error: directError } = await supabase
+      .from("messages")
+      .select(
+        `
+        id,
+        sender_id,
+        receiver_id,
+        content,
+        image_url,
+        lcd_teaser,
+        print_status,
+        created_at,
+        sender:users!messages_sender_id_fkey (
+          display_name,
+          avatar_url
+        )
+      `
+      )
+      .eq("receiver_id", userId)
+      .eq("print_status", "queued")
+      .order("created_at", { ascending: true });
+
+    console.log("📊 직접 쿼리 응답:", { data: directData, error: directError });
+
+    if (directError) {
+      console.error("❌ 직접 쿼리도 실패:", directError);
+      throw directError;
+    }
+
+    // 데이터 변환
+    const transformedData = (directData || []).map((item) => ({
+      id: item.id,
+      sender_id: item.sender_id,
+      receiver_id: item.receiver_id,
+      content: item.content,
+      image_url: item.image_url,
+      lcd_teaser: item.lcd_teaser,
+      print_status: item.print_status as "queued",
+      created_at: item.created_at,
+      sender_display_name: item.sender?.display_name || "Unknown",
+      sender_avatar_url: item.sender?.avatar_url || null,
+    }));
+
+    return transformedData;
+  } catch (error) {
+    console.error("❌ 대기 중인 메시지 조회 실패:", {
+      error,
+      message: error?.message,
+      details: error?.details,
+      hint: error?.hint,
+      code: error?.code,
+    });
+
+    // 안전하게 빈 배열 반환
+    console.warn("🔄 에러로 인해 빈 배열을 반환합니다.");
+    return [];
+  }
+}
