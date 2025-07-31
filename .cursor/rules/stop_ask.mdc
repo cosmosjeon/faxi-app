@@ -1,0 +1,72 @@
+---
+alwaysApply: true
+---
+# USER INTERVENTION RULES
+
+## STOP AND ASK USER WHEN:
+
+### Critical Decisions
+- Architecture/framework choices
+- Database schema design
+- API structure decisions
+- Security/auth implementation
+- Library selections
+
+### External Dependencies
+- Environment variables (.env values)
+- Database credentials
+- API keys/secrets
+- Server configurations
+- Deployment settings
+
+### Business Logic Clarification
+- Business rules details
+- User permissions/roles
+- Validation rules
+- Workflow processes
+- Error handling approaches
+
+### Database Operations
+- Manual data insertion
+- User/permission setup
+- SQL script execution
+- Database configuration
+- Data migration
+
+### System/Terminal Issues
+- Commands failing 3+ times
+- Permission errors
+- Port/process conflicts
+- Package install failures
+- Environment-specific problems
+
+### AI Limitations
+- Same error repeating 3+ times
+- Cannot determine system environment
+- External service auth failures
+- Complex dependency conflicts
+
+## 3-STRIKE RULE
+Stop immediately after 3 consecutive failures of the same task.
+
+## REQUEST FORMAT
+```
+STOP - USER INPUT NEEDED
+
+Issue: [brief description]
+Need: [what's required]
+Tried: [attempted solutions]
+Error: [last error message]
+
+Options:
+1. [option 1]
+2. [option 2]
+
+Waiting for your decision.
+```
+
+## RESUME FORMAT
+After user provides input:
+```
+Input received. Continuing...
+```
