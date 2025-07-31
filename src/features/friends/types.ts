@@ -25,13 +25,15 @@ export interface FriendWithProfile {
   id: string; // friendship id
   user_id: string;
   friend_id: string;
-  is_close_friend: boolean;
+  is_close_friend: boolean; // 양방향 친한친구 상태
   status: "pending" | "accepted" | "blocked";
   created_at: string;
   updated_at: string;
   friend_profile: UserProfile;
   is_mutual: boolean; // 맞팔 여부
   is_received_request: boolean; // 받은 요청인지 여부
+  // 친한친구 신청 관련 추가 필드들
+  close_friend_request_status?: CloseFriendRequestStatus;
 }
 
 // 친구 검색 결과 타입
@@ -41,12 +43,31 @@ export interface SearchResult {
   is_mutual: boolean;
 }
 
-// API 요청/응답 타입들
+// 친한친구 신청 관련 타입들
+export interface CloseFriendRequest {
+  id: string;
+  requester_id: string;
+  target_id: string;
+  status: "pending" | "accepted" | "rejected";
+  created_at: string;
+  updated_at: string;
+  requester_profile?: UserProfile;
+  target_profile?: UserProfile;
+}
+
+export interface CloseFriendRequestStatus {
+  status: "none" | "pending" | "accepted" | "rejected";
+  direction?: "sent" | "received";
+  requestId?: string;
+}
+
+// API 요청 타입들
 export interface AddFriendRequest {
   friend_id: string;
 }
 
-export interface UpdateCloseFriendRequest {
-  friendship_id: string;
-  is_close_friend: boolean;
+export interface SendCloseFriendRequest {
+  target_id: string;
 }
+
+// ❌ UpdateCloseFriendRequest 제거됨 (토글 방식 대신 신청-수락 방식 사용)
