@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -36,8 +36,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuthStore } from "@/stores/auth.store";
-import { updateMessagePrintStatus } from "@/features/messages/api";
-import { isCloseFriend } from "@/features/friends/api";
+
+import {
+  getMessagesList,
+  updateMessagePrintStatus,
+  getQueuedMessages,
+} from "@/features/messages/api";
+import { areCloseFriends } from "@/features/friends/api";
+
 import type { MessageWithProfiles } from "@/features/messages/types";
 import { supabase } from "@/lib/supabase/client";
 import { useBlePrinter } from "@/hooks/useBlePrinter";
@@ -57,29 +63,19 @@ export default function HomePage() {
   const router = useRouter();
   const { profile, signOut } = useAuthStore();
   const printer = useBlePrinter();
-  const queryClient = useQueryClient();
 
-  // React Query를 사용한 메시지 데이터 관리
-  const {
-    data: allMessages = [],
-    isLoading,
-    error: messagesError,
-    refetch: refetchMessages,
-  } = useMessagesQuery(profile?.id);
 
-  // 캐시된 데이터가 있으면 로딩 상태를 숨김 (즉시 표시)
-  const showLoading = isLoading && allMessages.length === 0;
-
-  // 받은 메시지 중 대기중인 메시지만 필터링
-  const messages = allMessages.filter(
-    (msg) => msg.receiver_id === profile?.id && msg.print_status === "pending"
-  );
-
-  const updateMessagePrintStatusMutation =
-    useUpdateMessagePrintStatusMutation();
-
-  // 다른 페이지 데이터 미리 로드
-  usePrefetchData();
+  // 프린터 상태 실시간 모니터링 (디버깅용)
+  useEffect(() => {
+    console.log("🔄 프린터 상태 변화 감지:", {
+      status: printer.status,
+      isConnected: printer.isConnected,
+      connectedPrinter: printer.connectedPrinter,
+      timestamp: new Date().toLocaleTimeString(),
+    });
+  }, [printer.status, printer.isConnected, printer.connectedPrinter]);
+  const [messages, setMessages] = useState<MessageWithProfiles[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [processingMessages, setProcessingMessages] = useState<Set<string>>(
     new Set()
@@ -121,54 +117,322 @@ export default function HomePage() {
     }
   };
 
-  // 에러 처리
-  if (messagesError) {
-    toast({
-      title: "로드 실패",
-      description: "메시지 목록을 불러오는데 실패했습니다.",
-      variant: "destructive",
+
+  // 메시지 목록 로드
+  const loadMessages = useCallback(async () => {
+    if (!profile) return;
+
+    setIsLoading(true);
+    try {
+      const messagesList = await getMessagesList(profile.id);
+
+      console.log("📋 전체 메시지 목록 로드:", {
+        total_count: messagesList.length,
+        by_status: {
+          pending: messagesList.filter((m) => m.print_status === "pending")
+            .length,
+          approved: messagesList.filter((m) => m.print_status === "approved")
+            .length,
+          queued: messagesList.filter((m) => m.print_status === "queued")
+            .length,
+          completed: messagesList.filter((m) => m.print_status === "completed")
+            .length,
+          failed: messagesList.filter((m) => m.print_status === "failed")
+            .length,
+        },
+      });
+
+      // 받은 메시지 상세 정보 (더 상세하게)
+      const receivedMessages = messagesList.filter(
+        (m) => m.receiver_id === profile.id
+      );
+      console.log("📨 받은 메시지 상세 정보:", {
+        count: receivedMessages.length,
+        messages: receivedMessages.map((m) => ({
+          id: m.id,
+          sender: m.sender_profile.display_name,
+          print_status: m.print_status,
+          created_at: m.created_at,
+        })),
+      });
+
+      // 받은 메시지 중 대기중인 메시지만 필터링 (pending + queued)
+      const pendingReceivedMessages = messagesList.filter(
+        (msg) =>
+          msg.receiver_id === profile.id &&
+          (msg.print_status === "pending" || msg.print_status === "queued")
+      );
+
+      console.log("📋 UI에 표시할 메시지:", {
+        count: pendingReceivedMessages.length,
+        messages: pendingReceivedMessages.map((m) => ({
+          id: m.id,
+          sender: m.sender_profile.display_name,
+          print_status: m.print_status,
+        })),
+      });
+
+      setMessages(pendingReceivedMessages);
+
+      // 프린터가 연결되지 않은 상태에서 approved 메시지들을 queued로 변경
+      if (printer.status !== "connected") {
+        const approvedMessages = receivedMessages.filter(
+          (msg) => msg.print_status === "approved"
+        );
+
+        console.log("🔍 approved 메시지 검사:", {
+          printer_status: printer.status,
+          approved_count: approvedMessages.length,
+          approved_messages: approvedMessages.map((m) => ({
+            id: m.id,
+            sender: m.sender_profile.display_name,
+            print_status: m.print_status,
+          })),
+        });
+
+        if (approvedMessages.length > 0) {
+          console.log(
+            `🔄 ${approvedMessages.length}개의 approved 메시지를 queued로 변경 시작`
+          );
+
+          // 모든 approved 메시지를 순차적으로 처리
+          for (const msg of approvedMessages) {
+            try {
+              console.log(
+                `🔄 처리 중: ${msg.id} (${msg.sender_profile.display_name})`
+              );
+              await updateMessagePrintStatus(msg.id, "queued");
+              console.log(`✅ DB 업데이트 완료: ${msg.id} (approved → queued)`);
+
+              // UI에서도 상태 업데이트
+              setMessages((prev) => {
+                const existingIndex = prev.findIndex((m) => m.id === msg.id);
+                const updatedMsg = { ...msg, print_status: "queued" as const };
+
+                if (existingIndex >= 0) {
+                  const newMessages = [...prev];
+                  newMessages[existingIndex] = updatedMsg;
+                  return newMessages;
+                } else {
+                  return [...prev, updatedMsg];
+                }
+              });
+
+              console.log(`✅ UI 업데이트 완료: ${msg.id}`);
+            } catch (error) {
+              console.error(`❌ 메시지 상태 변경 실패: ${msg.id}`, error);
+            }
+          }
+
+          console.log("🎯 모든 approved → queued 변경 완료");
+        } else {
+          // approved 메시지가 없다면 pending 메시지 중 친한친구 메시지 확인
+          console.log(
+            "🤔 approved 메시지가 없음 - pending 메시지 중 친한친구 확인"
+          );
+          const pendingMessages = receivedMessages.filter(
+            (msg) => msg.print_status === "pending"
+          );
+
+          console.log("📋 pending 메시지 확인:", {
+            pending_count: pendingMessages.length,
+            pending_messages: pendingMessages.map((m) => ({
+              id: m.id,
+              sender: m.sender_profile.display_name,
+              print_status: m.print_status,
+            })),
+          });
+
+          if (pendingMessages.length > 0) {
+            console.log("🔍 pending 메시지들의 친한친구 관계 확인 시작");
+
+            for (const msg of pendingMessages) {
+              try {
+                console.log(
+                  `🔄 친한친구 관계 확인: ${msg.sender_profile.display_name} (${msg.id})`
+                );
+                const isCloseFriend = await areCloseFriends(
+                  profile.id,
+                  msg.sender_id
+                );
+
+                console.log(
+                  `📊 친한친구 확인 결과: ${msg.sender_profile.display_name} = ${isCloseFriend}`
+                );
+
+                if (isCloseFriend) {
+                  console.log(
+                    `💖 친한친구 발견! ${msg.sender_profile.display_name} 메시지를 queued로 변경`
+                  );
+
+                  // 친한친구 메시지를 queued로 변경
+                  await updateMessagePrintStatus(msg.id, "queued");
+                  console.log(
+                    `✅ DB 업데이트 완료: ${msg.id} (pending → queued)`
+                  );
+
+                  // UI 업데이트
+                  setMessages((prev) => {
+                    const existingIndex = prev.findIndex(
+                      (m) => m.id === msg.id
+                    );
+                    const updatedMsg = {
+                      ...msg,
+                      print_status: "queued" as const,
+                    };
+
+                    if (existingIndex >= 0) {
+                      const newMessages = [...prev];
+                      newMessages[existingIndex] = updatedMsg;
+                      return newMessages;
+                    } else {
+                      return [...prev, updatedMsg];
+                    }
+                  });
+
+                  console.log(`✅ UI 업데이트 완료: ${msg.id}`);
+                }
+              } catch (error) {
+                console.error(`❌ 친한친구 확인 실패: ${msg.id}`, error);
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("메시지 목록 로드 실패:", error);
+      toast({
+        title: "로드 실패",
+        description: "메시지 목록을 불러오는데 실패했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [profile, printer.status]);
+
+  // 친한친구 메시지 처리 함수
+  const handleCloseFriendMessage = async (message: MessageWithProfiles) => {
+    console.log("💖 친한친구 메시지 처리 시작:", {
+      message_id: message.id,
+      sender: message.sender_profile.display_name,
+      printer_status: printer.status,
+      current_print_status: message.print_status,
     });
-  }
+
+    if (printer.status === "connected") {
+      // 프린터 연결됨: 바로 프린트
+      console.log("🖨️ 프린터 연결됨 - 즉시 프린트 실행");
+      await handleMessageAction(message.id, "approve", true);
+      toast({
+        title: "친한 친구의 메시지",
+        description: `${message.sender_profile.display_name}님의 메시지가 자동으로 프린트됩니다.`,
+      });
+    } else {
+      // 프린터 연결 안됨: 대기 상태로 설정
+      console.log("⏳ 프린터 미연결 - 메시지를 대기열에 추가");
+
+      try {
+        await updateMessagePrintStatus(message.id, "queued");
+        console.log("✅ DB에 queued 상태 저장 완료:", message.id);
+
+        // UI에서도 상태 업데이트
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === message.id
+              ? { ...msg, print_status: "queued" as const }
+              : msg
+          )
+        );
+        console.log("✅ UI 상태 업데이트 완료:", message.id);
+
+        toast({
+          title: "친한 친구의 메시지 대기 중",
+          description: `${message.sender_profile.display_name}님의 메시지가 프린터 연결을 기다립니다.`,
+        });
+      } catch (error) {
+        console.error("❌ 메시지 queued 상태 저장 실패:", error);
+      }
+    }
+  };
+
 
   // 새 메시지 처리 (자동 프린트 vs 확인 팝업)
   const handleNewMessage = async (newMessage: MessageWithProfiles) => {
-    console.log("🔔 새 메시지 수신:", newMessage);
+    console.log("🔔 새 메시지 수신 - 상세 정보:", {
+      id: newMessage.id,
+      sender: newMessage.sender_profile.display_name,
+      sender_id: newMessage.sender_id,
+      receiver_id: newMessage.receiver_id,
+      print_status: newMessage.print_status,
+      printer_connected: printer.status === "connected",
+      full_message: newMessage,
+    });
 
     // React Query로 메시지 목록 갱신
     refetchMessages();
 
+    // 친한친구 관계 직접 확인 (DB 트리거 디버깅용)
     try {
-      // 친한 친구인지 확인
-      const isCloseFriendStatus = await isCloseFriend(
+      const isCloseFriend = await areCloseFriends(
         profile!.id,
         newMessage.sender_id
       );
+      console.log("🔍 친한친구 관계 확인:", {
+        receiver_id: profile!.id,
+        sender_id: newMessage.sender_id,
+        is_close_friend: isCloseFriend,
+        message_print_status: newMessage.print_status,
+      });
+    } catch (error) {
+      console.error("❌ 친한친구 관계 확인 실패:", error);
+    }
 
-      if (isCloseFriendStatus) {
-        // 친한 친구: 자동 프린트
-        console.log("💖 친한 친구의 메시지 - 자동 프린트 실행");
-        await handleMessageAction(newMessage.id, "approve", true);
-
-        toast({
-          title: "친한 친구의 메시지",
-          description: `${newMessage.sender_profile.display_name}님의 메시지가 자동으로 프린트됩니다.`,
-        });
+    try {
+      // 1차: DB 트리거에서 이미 친한친구 확인을 완료함
+      // print_status가 'approved'면 친한친구 메시지임
+      if (newMessage.print_status === "approved") {
+        console.log("💖 친한 친구의 메시지 (DB 트리거에서 자동 승인됨)");
+        await handleCloseFriendMessage(newMessage);
       } else {
-        // 일반 친구: 확인 팝업
-        console.log("👥 일반 친구의 메시지 - 확인 팝업 표시");
-        setConfirmDialog({
-          isOpen: true,
-          message: newMessage,
-        });
+        // 2차: DB 트리거가 작동하지 않은 경우 클라이언트에서 확인
+        console.log("🔄 DB 트리거 미작동 - 클라이언트에서 친한친구 확인");
+        const isCloseFriend = await areCloseFriends(
+          profile!.id,
+          newMessage.sender_id
+        );
 
-        // 알림음 또는 진동 (추후 구현)
-        toast({
-          title: "새 메시지 도착",
-          description: `${newMessage.sender_profile.display_name}님이 메시지를 보냈습니다.`,
-        });
+        if (isCloseFriend) {
+          console.log("💖 친한 친구 확인됨 - 클라이언트에서 처리");
+          // 메시지 상태를 approved로 업데이트
+          await updateMessagePrintStatus(newMessage.id, "approved");
+
+          // UI에서도 상태 업데이트
+          const updatedMessage = {
+            ...newMessage,
+            print_status: "approved" as const,
+          };
+          setMessages((prev) =>
+            prev.map((msg) => (msg.id === newMessage.id ? updatedMessage : msg))
+          );
+
+          await handleCloseFriendMessage(updatedMessage);
+        } else {
+          // 일반 친구: 확인 팝업 (print_status = 'pending')
+          console.log("👥 일반 친구의 메시지 - 확인 팝업 표시");
+          setConfirmDialog({
+            isOpen: true,
+            message: newMessage,
+          });
+
+          toast({
+            title: "새 메시지 도착",
+            description: `${newMessage.sender_profile.display_name}님이 메시지를 보냈습니다.`,
+          });
+        }
       }
     } catch (error) {
-      console.error("새 메시지 처리 실패:", error);
+      console.error("❌ 새 메시지 처리 실패:", error);
       // 오류 발생 시 일반 친구로 처리
       setConfirmDialog({
         isOpen: true,
@@ -260,17 +524,29 @@ export default function HomePage() {
           } catch (printError) {
             console.error("프린트 작업 추가 실패:", printError);
 
-            // 프린터 연결 실패 시 상태를 다시 pending으로 되돌리기
+            // 프린터 연결 실패 시 상태 되돌리기
             try {
-              await updateMessagePrintStatus(messageId, "pending");
+              const message = messages.find((msg) => msg.id === messageId);
+              let revertStatus: "pending" | "queued" = "pending";
 
-              // 해당 메시지를 다시 목록에 추가 (pending 상태로)
+              // 친한친구인지 확인하여 적절한 상태로 되돌리기
+              if (message && profile) {
+                const isCloseFriend = await areCloseFriends(
+                  profile.id,
+                  message.sender_id
+                );
+                revertStatus = isCloseFriend ? "queued" : "pending";
+              }
+
+              await updateMessagePrintStatus(messageId, revertStatus);
+
+              // 해당 메시지를 다시 목록에 추가
               const failedMessage = messages.find(
                 (msg) => msg.id === messageId
               );
               if (failedMessage) {
                 setMessages((prev) => [
-                  { ...failedMessage, print_status: "pending" },
+                  { ...failedMessage, print_status: revertStatus },
                   ...prev,
                 ]);
               }
@@ -331,7 +607,182 @@ export default function HomePage() {
     setConfirmDialog({ isOpen: false, message: null });
   };
 
-  // React Query가 자동으로 데이터를 로드하므로 useEffect 제거
+
+  // 대기 중인 메시지 확인 함수 - 더 상세한 디버깅
+  const checkQueuedMessages = useCallback(async () => {
+    if (!profile) return;
+
+    try {
+      console.log("📋 대기 중인 메시지 확인 시작");
+
+      // 1단계: 일반 메시지 목록 다시 조회해서 현재 상태 확인
+      console.log("🔄 현재 DB 상태 재확인을 위해 메시지 목록 다시 조회");
+      const currentMessages = await getMessagesList(profile.id);
+      const currentReceivedMessages = currentMessages.filter(
+        (m) => m.receiver_id === profile.id
+      );
+
+      console.log("📊 현재 DB 상태:", {
+        total_messages: currentMessages.length,
+        received_messages: currentReceivedMessages.length,
+        by_status: {
+          pending: currentReceivedMessages.filter(
+            (m) => m.print_status === "pending"
+          ).length,
+          approved: currentReceivedMessages.filter(
+            (m) => m.print_status === "approved"
+          ).length,
+          queued: currentReceivedMessages.filter(
+            (m) => m.print_status === "queued"
+          ).length,
+          completed: currentReceivedMessages.filter(
+            (m) => m.print_status === "completed"
+          ).length,
+          failed: currentReceivedMessages.filter(
+            (m) => m.print_status === "failed"
+          ).length,
+        },
+        detailed_messages: currentReceivedMessages.map((m) => ({
+          id: m.id,
+          sender: m.sender_profile.display_name,
+          print_status: m.print_status,
+          created_at: m.created_at,
+        })),
+      });
+
+      // 2단계: getQueuedMessages RPC 함수 호출
+      const queuedMessages = await getQueuedMessages(profile.id);
+
+      console.log("📊 RPC로 조회한 대기 중인 메시지:", {
+        count: queuedMessages.length,
+        messages: queuedMessages.map((msg) => ({
+          id: msg.id,
+          sender: msg.sender_display_name,
+          print_status: msg.print_status,
+        })),
+      });
+
+      if (queuedMessages.length > 0) {
+        console.log(
+          `📨 ${queuedMessages.length}개의 대기 중인 친한친구 메시지 발견`
+        );
+        toast({
+          title: "대기 중인 메시지",
+          description: `${queuedMessages.length}개의 친한친구 메시지가 프린터 연결을 기다리고 있습니다.`,
+        });
+      } else {
+        console.log("🤔 RPC에서 0개 반환 - DB 상태와 비교 분석 필요");
+      }
+    } catch (error) {
+      console.error("❌ 대기 중인 메시지 조회 실패:", error);
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    loadMessages();
+  }, [loadMessages]);
+
+  // 별도 useEffect로 대기 메시지 확인 (loadMessages 완료 후)
+  useEffect(() => {
+    if (profile) {
+      // approved → queued 변경이 완료될 시간을 주기 위해 약간 지연
+      const timer = setTimeout(() => {
+        checkQueuedMessages();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [profile, checkQueuedMessages]);
+
+  // 프린터 연결 상태 변화 감지하여 대기 중인 메시지 자동 처리
+  const handlePrinterConnection = useCallback(async () => {
+    console.log("🔄 프린터 연결 처리 함수 실행:", {
+      profile: !!profile,
+      profile_id: profile?.id,
+      printer_status: printer.status,
+      timestamp: new Date().toLocaleTimeString(),
+    });
+
+    if (!profile || printer.status !== "connected") {
+      console.log("🔍 프린터 연결 확인 - 조건 불만족:", {
+        profile: !!profile,
+        printer_status: printer.status,
+      });
+      return;
+    }
+
+    try {
+      console.log("🖨️ 프린터 연결됨 - 대기 중인 메시지 확인");
+
+      // 현재 메시지 목록에서 queued 상태 확인
+      const currentQueuedMessages = messages.filter(
+        (msg) => msg.print_status === "queued"
+      );
+      console.log("📋 현재 UI에서 queued 상태 메시지:", {
+        count: currentQueuedMessages.length,
+        messages: currentQueuedMessages.map((msg) => ({
+          id: msg.id,
+          sender: msg.sender_profile.display_name,
+          print_status: msg.print_status,
+        })),
+      });
+
+      const queuedMessages = await getQueuedMessages(profile.id);
+
+      console.log("📊 DB에서 조회한 대기 중인 메시지:", {
+        count: queuedMessages.length,
+        messages: queuedMessages.map((msg) => ({
+          id: msg.id,
+          sender: msg.sender_display_name,
+          print_status: msg.print_status,
+        })),
+      });
+
+      if (queuedMessages.length > 0) {
+        toast({
+          title: "대기 중인 메시지 처리",
+          description: `${queuedMessages.length}개의 친한친구 메시지를 자동으로 프린트합니다.`,
+        });
+
+        // 대기 중인 메시지들을 순차적으로 처리
+        for (const queuedMessage of queuedMessages) {
+          try {
+            console.log(
+              `🔄 대기 메시지 프린트 시작: ${queuedMessage.id} (${queuedMessage.sender_display_name})`
+            );
+            await handleMessageAction(queuedMessage.id, "approve", true);
+            console.log(`✅ 대기 메시지 프린트 완료: ${queuedMessage.id}`);
+
+            // UI에서 메시지 상태 업데이트
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === queuedMessage.id
+                  ? { ...msg, print_status: "completed" as const }
+                  : msg
+              )
+            );
+          } catch (error) {
+            console.error(
+              `❌ 대기 메시지 프린트 실패: ${queuedMessage.id}`,
+              error
+            );
+          }
+        }
+      } else {
+        console.log("📝 대기 중인 메시지 없음");
+      }
+    } catch (error) {
+      console.error("대기 중인 메시지 처리 실패:", error);
+    }
+  }, [profile, printer.status, messages]);
+
+  useEffect(() => {
+    // 프린터 상태가 "connected"로 변경될 때만 실행
+    if (printer.status === "connected") {
+      console.log("⚡ 프린터 연결됨 - useEffect 트리거");
+      handlePrinterConnection();
+    }
+  }, [printer.status, handlePrinterConnection]);
+
 
   // 메시지 시간 포맷
   const formatMessageTime = (createdAt: string) => {
@@ -370,6 +821,16 @@ export default function HomePage() {
             프린트 준비
           </Badge>
         );
+      case "queued":
+        return (
+          <Badge
+            variant="outline"
+            className="gap-1 border-blue-200 text-blue-700 bg-blue-50"
+          >
+            <Clock size={12} />
+            프린터 대기
+          </Badge>
+        );
       case "completed":
         return (
           <Badge variant="outline" className="gap-1">
@@ -389,9 +850,9 @@ export default function HomePage() {
     }
   };
 
-  // 대기중인 메시지 개수
+  // 대기중인 메시지 개수 (pending + queued)
   const pendingCount = messages.filter(
-    (msg) => msg.print_status === "pending"
+    (msg) => msg.print_status === "pending" || msg.print_status === "queued"
   ).length;
 
   return (

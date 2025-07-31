@@ -1,9 +1,93 @@
 ---
 alwaysApply: false
 ---
+
 # Bug Report Debrief
 
 - **All mistakes made during development, the reasons behind them, and concrete measures to prevent them should be documented.**
 - **Be mindful not to repeat the same mistakes again.**
 - **All bugs must be documented and uploaded to this file without exception.
-Whenever a bug occurs, it must be recorded in this file.**
+  Whenever a bug occurs, it must be recorded in this file.**
+
+---
+
+## Bug #001: 친한친구 수락 후 데이터베이스 등록 실패 (2025-01-31)
+
+### **문제 현상**
+
+- 친한친구 요청 → 상대 수락 → DB에 친한친구로 등록되지 않음
+- UI에서 여전히 "친한친구 되기" 버튼 표시
+- "친한친구" 상태로 변경되지 않음
+
+### **근본 원인**
+
+1. **누락된 RPC 함수**: `accept_close_friend_request` RPC 함수가 데이터베이스에 정의되지 않음
+2. **불완전한 마이그레이션**: 이전에 제공한 SQL이 실제로 적용되지 않았거나 함수가 누락됨
+
+### **발생 이유**
+
+- API 코드에서는 `supabase.rpc("accept_close_friend_request")` 호출
+- 하지만 데이터베이스에 해당 함수가 존재하지 않아 호출 실패
+- 에러가 적절히 처리되지 않아 UI에서 성공한 것처럼 보임
+
+### **해결 방안**
+
+1. **완전한 마이그레이션 파일 생성**: `20250131_add_close_friend_request_system.sql`
+2. **RPC 함수 구현**:
+   - `accept_close_friend_request`: 친한친구 신청 수락
+   - `are_close_friends`: 양방향 친한친구 상태 확인
+   - `remove_close_friendship`: 친한친구 관계 해제
+3. **강화된 에러 처리**: RPC 응답 검증 및 구체적 에러 메시지
+
+### **예방 조치**
+
+- [ ] 데이터베이스 함수 존재 여부를 개발 초기에 확인
+- [ ] RPC 호출 전 함수 존재 여부 검증 로직 추가
+- [ ] 마이그레이션 적용 후 기능 테스트 자동화
+
+---
+
+## Bug #002: 친한친구 요청 UI 중복 표시 (2025-01-31)
+
+### **문제 현상**
+
+- 친한친구 요청이 왔을 때 위아래로 수락 라인이 두 개 표시
+- "받은 친한친구 신청들" 섹션과 "내 친구들" 섹션에서 중복 표시
+
+### **근본 원인**
+
+- `getCloseFriendStatus` 함수에서 "received_request" 상태를 반환
+- 동일한 친구가 두 섹션에서 동시에 표시됨
+
+### **발생 이유**
+
+- UI 로직 설계 시 섹션별 표시 우선순위를 고려하지 않음
+- 친한친구 요청과 일반 친구 관계의 상태 분리가 불완전
+
+### **해결 방안**
+
+- `getCloseFriendStatus` 함수 수정
+- 받은 친한친구 신청은 "받은 친한친구 신청들" 섹션에서만 표시
+- "내 친구들" 섹션에서는 일반친구로 처리하여 중복 방지
+
+### **예방 조치**
+
+- [ ] UI 섹션별 표시 로직 명확한 설계 문서 작성
+- [ ] 상태 우선순위 매트릭스 정의
+- [ ] UI 컴포넌트 간 상태 중복 검증 테스트
+
+---
+
+## 교훈 및 개선사항
+
+### **개발 프로세스 개선**
+
+1. **데이터베이스 변경 검증**: 마이그레이션 적용 후 즉시 기능 테스트
+2. **에러 처리 강화**: RPC 호출 실패 시 명확한 사용자 피드백
+3. **UI 상태 관리**: 복잡한 상태 로직에 대한 우선순위 정의
+
+### **코드 품질 개선**
+
+1. **로깅 시스템**: 중요한 비즈니스 로직에 상세한 로깅 추가
+2. **타입 안정성**: RPC 응답 타입 정의 및 검증
+3. **테스트 커버리지**: 친한친구 시스템 전체 flow 테스트

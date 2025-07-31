@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 
 interface ImageEditorProps {
   image: File;
+  mode?: "printer" | "message";
   onEditComplete?: (editedImageBlob: Blob) => void;
   onCancel: () => void;
 }
@@ -29,6 +30,7 @@ interface EditState {
 
 export function ImageEditor({
   image,
+  mode = "printer",
   onEditComplete,
   onCancel,
 }: ImageEditorProps) {
@@ -275,31 +277,115 @@ export function ImageEditor({
     };
   }, [isDragging, handleCropMouseMove, handleCropMouseUp]);
 
-  // 편집 완료 - 미리보기 페이지로 이동
+  // 편집 완료 처리
   const handleEditComplete = async () => {
-    if (!imageUrl) return;
+    if (!imageUrl || !imageRef.current) return;
 
     try {
-      // 이미지 파일을 Base64로 변환
-      const base64Image = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(image);
-      });
+      if (mode === "message" && onEditComplete) {
+        // 메시지 모드: 편집된 이미지를 Blob으로 생성하여 콜백 호출
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Canvas context not available");
 
-      // 편집 데이터를 세션 스토리지에 저장
-      const editData = {
-        imageBase64: base64Image, // Base64로 인코딩된 이미지
-        rotation: editState.rotation,
-        crop: editState.crop,
-        text: editState.text,
-      };
+        const img = imageRef.current;
 
-      sessionStorage.setItem("photoEditData", JSON.stringify(editData));
+        // 실제 출력 크기로 canvas 설정
+        const printWidth = 384;
+        const cropAspectRatio = editState.crop.width / editState.crop.height;
+        const imageHeight = Math.round(printWidth / cropAspectRatio);
+        const textHeight = editState.text.trim() ? 100 : 0;
+        const padding = editState.text.trim() ? 25 : 0;
+        const totalHeight = imageHeight + textHeight + padding;
 
-      // 미리보기 페이지로 이동
-      router.push("/printer/photo-edit/preview");
+        canvas.width = printWidth;
+        canvas.height = totalHeight;
+
+        // 배경 흰색으로 초기화
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 회전 적용하여 이미지 그리기
+        ctx.save();
+        ctx.translate(printWidth / 2, imageHeight / 2);
+        ctx.rotate((editState.rotation * Math.PI) / 180);
+
+        // 크롭된 이미지 그리기
+        ctx.drawImage(
+          img,
+          editState.crop.x,
+          editState.crop.y,
+          editState.crop.width,
+          editState.crop.height,
+          -printWidth / 2,
+          -imageHeight / 2,
+          printWidth,
+          imageHeight
+        );
+        ctx.restore();
+
+        // 텍스트 추가
+        if (editState.text.trim()) {
+          ctx.fillStyle = "black";
+          ctx.font = "14px sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "top";
+
+          const textStartY = imageHeight + padding;
+          const maxWidth = printWidth - 20;
+          const words = editState.text.split(" ");
+          const lines: string[] = [];
+          let currentLine = "";
+
+          words.forEach((word) => {
+            const testLine = currentLine + (currentLine ? " " : "") + word;
+            const metrics = ctx.measureText(testLine);
+
+            if (metrics.width > maxWidth && currentLine) {
+              lines.push(currentLine);
+              currentLine = word;
+            } else {
+              currentLine = testLine;
+            }
+          });
+
+          if (currentLine) {
+            lines.push(currentLine);
+          }
+
+          // 각 줄을 그리기
+          const lineHeight = 18;
+          lines.forEach((line, index) => {
+            const y = textStartY + index * lineHeight + 6;
+            ctx.fillText(line, canvas.width / 2, y);
+          });
+        }
+
+        // Canvas를 Blob으로 변환
+        canvas.toBlob((blob) => {
+          if (blob) {
+            onEditComplete(blob);
+          }
+        }, "image/png");
+      } else {
+        // 프린터 모드: 기존 로직 (세션 스토리지 저장 후 페이지 이동)
+        const base64Image = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(image);
+        });
+
+        const editData = {
+          imageBase64: base64Image,
+          rotation: editState.rotation,
+          crop: editState.crop,
+          text: editState.text,
+        };
+
+        sessionStorage.setItem("photoEditData", JSON.stringify(editData));
+        router.push("/printer/photo-edit/preview");
+      }
     } catch (error) {
       console.error("이미지 처리 실패:", error);
     }
@@ -458,7 +544,7 @@ export function ImageEditor({
           disabled={!isLoaded}
         >
           <Eye size={16} className="mr-1" />
-          미리보기
+          {mode === "message" ? "편집 완료" : "미리보기"}
         </Button>
       </div>
     </div>

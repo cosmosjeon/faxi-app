@@ -6,7 +6,7 @@ export interface Message {
   content: string | null;
   image_url: string | null;
   lcd_teaser: string | null;
-  print_status: "pending" | "approved" | "completed" | "failed";
+  print_status: "pending" | "approved" | "completed" | "failed" | "queued";
   printed_at: string | null;
   created_at: string;
   updated_at: string;
@@ -36,7 +36,7 @@ export interface MessageWithProfiles {
   content: string | null;
   image_url: string | null;
   lcd_teaser: string | null;
-  print_status: "pending" | "approved" | "completed" | "failed";
+  print_status: "pending" | "approved" | "completed" | "failed" | "queued";
   printed_at: string | null;
   created_at: string;
   updated_at: string;
