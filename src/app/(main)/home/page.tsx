@@ -51,11 +51,13 @@ import {
 import { usePrefetchData } from "@/hooks/usePrefetchData";
 import { MessageListSkeleton } from "@/components/ui/message-skeleton";
 import { MessageCard } from "@/components/domain/messages/MessageCard";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function HomePage() {
   const router = useRouter();
   const { profile, signOut } = useAuthStore();
   const printer = useBlePrinter();
+  const queryClient = useQueryClient();
 
   // React Query를 사용한 메시지 데이터 관리
   const {
@@ -94,8 +96,16 @@ export default function HomePage() {
 
   // 로그아웃 핸들러
   const handleLogout = async () => {
+    console.log("로그아웃 버튼 클릭됨");
     try {
+      console.log("signOut 함수 호출 시작");
+
+      // React Query 캐시 모두 클리어
+      queryClient.clear();
+      console.log("React Query 캐시 클리어 완료");
+
       await signOut();
+      console.log("signOut 함수 호출 완료");
       router.push("/login");
       toast({
         title: "로그아웃 완료",

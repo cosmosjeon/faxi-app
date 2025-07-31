@@ -22,14 +22,24 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function ProfilePage() {
   const router = useRouter();
   const { profile, signOut } = useAuthStore();
+  const queryClient = useQueryClient();
 
   const handleSignOut = async () => {
+    console.log("프로필 페이지 로그아웃 버튼 클릭됨");
     try {
+      console.log("signOut 함수 호출 시작");
+
+      // React Query 캐시 모두 클리어
+      queryClient.clear();
+      console.log("React Query 캐시 클리어 완료");
+
       await signOut();
+      console.log("signOut 함수 호출 완료");
       router.push("/login");
       toast({
         title: "로그아웃 완료",
