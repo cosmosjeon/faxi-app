@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Image, Send, Users, X, ArrowLeft, Check } from "lucide-react";
+import { Image, Send, Users, X, ArrowLeft, Check, Edit3 } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -35,6 +35,7 @@ import { messageToasts, imageToasts } from "@/lib/toasts";
 import { useFriendsQuery } from "@/hooks/queries/useFriendsQuery";
 import { useSendMessageMutation } from "@/hooks/queries/useMessagesQuery";
 import { compressImage, validateImageFile } from "@/lib/image-utils";
+import { ImageEditor } from "@/components/domain/image/ImageEditor";
 
 export default function ComposePage() {
   const router = useRouter();
@@ -67,6 +68,10 @@ export default function ComposePage() {
 
   // 이미지 미리보기
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  // 편집 모드 상태
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingImage, setEditingImage] = useState<File | null>(null);
 
   // React Query가 자동으로 친구 목록을 로드하므로 useEffect 제거
 
@@ -124,14 +129,9 @@ export default function ComposePage() {
         format: "jpeg",
       });
 
-      setFormData((prev) => ({ ...prev, image_file: compressedFile }));
-
-      // 이미지 미리보기 생성
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(compressedFile);
+      // 편집 모드로 전환
+      setEditingImage(compressedFile);
+      setIsEditing(true);
 
       if (errors.image_file) {
         setErrors((prev) => ({ ...prev, image_file: undefined }));
@@ -155,10 +155,55 @@ export default function ComposePage() {
     }
   };
 
+  // 이미지 편집 완료 핸들러
+  const handleEditComplete = (editedImageBlob: Blob) => {
+    if (!editingImage) return;
+
+    try {
+      // Blob을 File 객체로 변환
+      const editedFile = new File([editedImageBlob], editingImage.name, {
+        type: "image/png",
+      });
+
+      setFormData((prev) => ({ ...prev, image_file: editedFile }));
+
+      // 편집된 이미지 미리보기 생성
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(editedFile);
+
+      // 편집 모드 종료
+      setIsEditing(false);
+      setEditingImage(null);
+
+      toast({
+        title: "편집 완료",
+        description: "이미지 편집이 완료되었습니다.",
+      });
+    } catch (error) {
+      console.error("편집된 이미지 처리 실패:", error);
+      toast({
+        title: "편집 실패",
+        description: "편집된 이미지를 처리하는 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // 이미지 편집 취소 핸들러
+  const handleEditCancel = () => {
+    setIsEditing(false);
+    setEditingImage(null);
+  };
+
   // 이미지 제거 핸들러
   const handleImageRemove = () => {
     setFormData((prev) => ({ ...prev, image_file: null }));
     setImagePreview(null);
+    setIsEditing(false);
+    setEditingImage(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -181,7 +226,6 @@ export default function ComposePage() {
         content: formData.content || undefined,
         image_file: formData.image_file || undefined,
         lcd_teaser: formData.lcd_teaser || undefined,
-        sender_id: profile.id,
       });
 
       messageToasts.sendSuccess();
@@ -194,6 +238,8 @@ export default function ComposePage() {
         lcd_teaser: "",
       });
       setImagePreview(null);
+      setIsEditing(false);
+      setEditingImage(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -217,6 +263,44 @@ export default function ComposePage() {
     (formData.content.trim() || formData.image_file) &&
     !sendMessageMutation.isPending &&
     Object.keys(errors).length === 0;
+
+  // 편집 모드일 때는 편집 UI만 표시
+  if (isEditing && editingImage) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="max-w-md mx-auto space-y-4">
+          {/* 헤더 */}
+          <div className="bg-white rounded-lg p-4 shadow-sm flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleEditCancel}
+              className="p-2"
+            >
+              <ArrowLeft size={20} />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">이미지 편집</h1>
+              <p className="text-gray-600 mt-1">
+                사진을 자르고 회전하여 완벽하게 만들어보세요
+              </p>
+            </div>
+          </div>
+
+          {/* 이미지 편집기 */}
+          <Card>
+            <CardContent className="p-4">
+              <ImageEditor
+                image={editingImage}
+                onEditComplete={handleEditComplete}
+                onCancel={handleEditCancel}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -380,6 +464,9 @@ export default function ComposePage() {
               <Image size={20} />
               이미지 첨부 (선택)
             </CardTitle>
+            <CardDescription>
+              이미지를 선택하면 편집할 수 있습니다
+            </CardDescription>
             {errors.image_file && (
               <p className="text-sm text-red-500">{errors.image_file}</p>
             )}
@@ -392,14 +479,29 @@ export default function ComposePage() {
                   alt="이미지 미리보기"
                   className="w-full rounded-lg max-h-48 object-cover"
                 />
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleImageRemove}
-                  className="absolute top-2 right-2 p-1 h-8 w-8"
-                >
-                  <X size={14} />
-                </Button>
+                <div className="absolute top-2 right-2 flex gap-1">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      if (formData.image_file) {
+                        setEditingImage(formData.image_file);
+                        setIsEditing(true);
+                      }
+                    }}
+                    className="p-1 h-8 w-8"
+                  >
+                    <Edit3 size={14} />
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleImageRemove}
+                    className="p-1 h-8 w-8"
+                  >
+                    <X size={14} />
+                  </Button>
+                </div>
                 <div className="mt-2 text-sm text-gray-600">
                   {formData.image_file?.name} (
                   {(formData.image_file?.size || 0 / 1024 / 1024).toFixed(1)}MB)
@@ -413,6 +515,9 @@ export default function ComposePage() {
                 <Image size={48} className="mx-auto text-gray-400 mb-4" />
                 <p className="text-gray-500">이미지를 선택하세요</p>
                 <p className="text-xs text-gray-400 mt-1">JPG, PNG 최대 5MB</p>
+                <p className="text-xs text-blue-500 mt-2">
+                  선택 후 크롭, 회전, 문구 추가 가능
+                </p>
               </div>
             )}
             <input

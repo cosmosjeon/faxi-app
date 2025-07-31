@@ -36,6 +36,7 @@ interface AuthActions {
   signOut: () => Promise<void>; // 로그아웃
   fetchProfile: () => Promise<void>; // 프로필 정보 가져오기
   reset: () => void; // 상태 초기화
+  refreshSession: () => Promise<void>; // 세션 새로고침
 }
 
 // 초기 상태 정의
@@ -57,6 +58,42 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   setProfile: (profile) => set({ profile }),
   setLoading: (isLoading) => set({ isLoading }),
   setInitialized: (isInitialized) => set({ isInitialized }),
+
+  // 세션 새로고침 함수
+  refreshSession: async () => {
+    try {
+      console.log("🔄 세션 새로고침 시작...");
+      const { data, error } = await supabase.auth.refreshSession();
+      
+      if (error) {
+        console.error("❌ 세션 새로고침 실패:", error);
+        throw error;
+      }
+
+      if (data.session) {
+        console.log("✅ 세션 새로고침 성공:", data.session.user.id);
+        set({ 
+          session: data.session, 
+          user: data.session.user,
+          isLoading: false 
+        });
+      } else {
+        console.log("ℹ️ 세션 새로고침 결과: 세션 없음");
+        set({ 
+          session: null, 
+          user: null,
+          isLoading: false 
+        });
+      }
+    } catch (error) {
+      console.error("❌ 세션 새로고침 중 오류:", error);
+      set({ 
+        session: null, 
+        user: null,
+        isLoading: false 
+      });
+    }
+  },
 
   // OAuth 로그인 함수 (Google, Kakao)
   signInWithOAuth: async (provider) => {
@@ -104,10 +141,14 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   signOut: async () => {
     set({ isLoading: true });
     try {
+      console.log("🔄 로그아웃 시작...");
+      
       // 실제 Supabase 로그아웃
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 
+      console.log("✅ 로그아웃 성공");
+      
       // 모든 인증 상태 초기화
       set({
         user: null,
@@ -116,7 +157,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         isLoading: false,
       });
     } catch (error) {
-      console.error("로그아웃 실패:", error);
+      console.error("❌ 로그아웃 실패:", error);
       set({ isLoading: false });
       throw error;
     }
@@ -125,9 +166,14 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   // 사용자 프로필 정보 가져오기
   fetchProfile: async () => {
     const { user } = get();
-    if (!user) return;
+    if (!user) {
+      console.log("ℹ️ 사용자 정보 없음, 프로필 조회 건너뜀");
+      return;
+    }
 
     try {
+      console.log("🔄 프로필 조회 시작:", user.id);
+      
       // Supabase에서 사용자 프로필 정보 조회
       const { data, error } = await supabase
         .from("users")
@@ -136,22 +182,28 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         .single();
 
       if (error && error.code !== "PGRST116") {
+        console.error("❌ 프로필 조회 실패:", error);
         throw error;
       }
 
       // 프로필이 있는 경우에만 설정
       if (data) {
+        console.log("✅ 프로필 조회 성공:", data.display_name);
         set({ profile: data });
       } else {
+        console.log("ℹ️ 프로필 없음 (온보딩 필요)");
         // 프로필이 없는 경우 null로 설정 (온보딩 페이지로 리디렉션됨)
         set({ profile: null });
       }
     } catch (error) {
-      console.error("프로필 조회 실패:", error);
+      console.error("❌ 프로필 조회 실패:", error);
       set({ profile: null });
     }
   },
 
   // 상태 초기화 함수
-  reset: () => set(initialState),
+  reset: () => {
+    console.log("🔄 인증 상태 초기화");
+    set(initialState);
+  },
 }));
