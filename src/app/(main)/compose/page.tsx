@@ -24,8 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuthStore } from "@/stores/auth.store";
-import { getFriendsList } from "@/features/friends/api";
-import { sendMessage, validateMessageForm } from "@/features/messages/api";
+import { validateMessageForm } from "@/features/messages/api";
 import type { FriendWithProfile } from "@/features/friends/types";
 import type {
   MessageFormData,
@@ -33,16 +32,27 @@ import type {
 } from "@/features/messages/types";
 import { toast } from "@/hooks/use-toast";
 import { messageToasts, imageToasts } from "@/lib/toasts";
+import { useFriendsQuery } from "@/hooks/queries/useFriendsQuery";
+import { useSendMessageMutation } from "@/hooks/queries/useMessagesQuery";
+import { compressImage, validateImageFile } from "@/lib/image-utils";
 
 export default function ComposePage() {
   const router = useRouter();
   const { profile } = useAuthStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 상태 관리
-  const [friends, setFriends] = useState<FriendWithProfile[]>([]);
-  const [isLoadingFriends, setIsLoadingFriends] = useState(true);
-  const [isSending, setIsSending] = useState(false);
+  // React Query를 사용한 친구 데이터 관리
+  const { data: allFriends = [], isLoading: isLoadingFriends } =
+    useFriendsQuery(profile?.id);
+
+  // 승인된 친구만 필터링
+  const friends = allFriends.filter((friend) => friend.status === "accepted");
+
+  // 캐시된 데이터가 있으면 로딩 상태를 숨김 (즉시 표시)
+  const showLoading = isLoadingFriends && allFriends.length === 0;
+
+  // 메시지 전송 mutation
+  const sendMessageMutation = useSendMessageMutation();
 
   // 폼 데이터
   const [formData, setFormData] = useState<MessageFormData>({
@@ -58,33 +68,7 @@ export default function ComposePage() {
   // 이미지 미리보기
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
-  // 친구 목록 로드
-  const loadFriends = async () => {
-    if (!profile) return;
-
-    setIsLoadingFriends(true);
-    try {
-      const friendsList = await getFriendsList(profile.id);
-      // 승인된 친구만 표시
-      const acceptedFriends = friendsList.filter(
-        (friend) => friend.status === "accepted"
-      );
-      setFriends(acceptedFriends);
-    } catch (error) {
-      console.error("친구 목록 로드 실패:", error);
-      toast({
-        title: "로드 실패",
-        description: "친구 목록을 불러오는데 실패했습니다.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingFriends(false);
-    }
-  };
-
-  useEffect(() => {
-    loadFriends();
-  }, [profile]);
+  // React Query가 자동으로 친구 목록을 로드하므로 useEffect 제거
 
   // 텍스트 입력 핸들러
   const handleContentChange = (value: string) => {
@@ -113,35 +97,61 @@ export default function ComposePage() {
   };
 
   // 이미지 선택 핸들러
-  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // 파일 크기 및 타입 검사
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
-
-    if (file.size > maxSize) {
+    // 파일 유효성 검사
+    const validation = validateImageFile(file);
+    if (!validation.isValid) {
       imageToasts.uploadError();
+      toast({
+        title: "이미지 업로드 실패",
+        description: validation.error,
+        variant: "destructive",
+      });
       return;
     }
 
-    if (!allowedTypes.includes(file.type)) {
+    try {
+      // 이미지 압축
+      const compressedFile = await compressImage(file, {
+        maxWidth: 800,
+        maxHeight: 600,
+        quality: 0.8,
+        format: "jpeg",
+      });
+
+      setFormData((prev) => ({ ...prev, image_file: compressedFile }));
+
+      // 이미지 미리보기 생성
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(compressedFile);
+
+      if (errors.image_file) {
+        setErrors((prev) => ({ ...prev, image_file: undefined }));
+      }
+
+      // 압축 성공 메시지
+      const originalSize = (file.size / 1024 / 1024).toFixed(2);
+      const compressedSize = (compressedFile.size / 1024 / 1024).toFixed(2);
+      toast({
+        title: "이미지 최적화 완료",
+        description: `${originalSize}MB → ${compressedSize}MB로 압축되었습니다.`,
+      });
+    } catch (error) {
+      console.error("이미지 압축 실패:", error);
       imageToasts.uploadError();
-      return;
-    }
-
-    setFormData((prev) => ({ ...prev, image_file: file }));
-
-    // 이미지 미리보기 생성
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setImagePreview(e.target?.result as string);
-    };
-    reader.readAsDataURL(file);
-
-    if (errors.image_file) {
-      setErrors((prev) => ({ ...prev, image_file: undefined }));
+      toast({
+        title: "이미지 처리 실패",
+        description: "이미지를 처리하는 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -165,17 +175,14 @@ export default function ComposePage() {
       return;
     }
 
-    setIsSending(true);
     try {
-      await sendMessage(
-        {
-          receiver_id: formData.receiver_id,
-          content: formData.content || undefined,
-          image_file: formData.image_file || undefined,
-          lcd_teaser: formData.lcd_teaser || undefined,
-        },
-        profile.id
-      );
+      await sendMessageMutation.mutateAsync({
+        receiver_id: formData.receiver_id,
+        content: formData.content || undefined,
+        image_file: formData.image_file || undefined,
+        lcd_teaser: formData.lcd_teaser || undefined,
+        sender_id: profile.id,
+      });
 
       messageToasts.sendSuccess();
 
@@ -196,8 +203,6 @@ export default function ComposePage() {
     } catch (error) {
       console.error("메시지 전송 실패:", error);
       messageToasts.sendError();
-    } finally {
-      setIsSending(false);
     }
   };
 
@@ -210,7 +215,7 @@ export default function ComposePage() {
   const canSend =
     formData.receiver_id &&
     (formData.content.trim() || formData.image_file) &&
-    !isSending &&
+    !sendMessageMutation.isPending &&
     Object.keys(errors).length === 0;
 
   return (
@@ -246,7 +251,7 @@ export default function ComposePage() {
             )}
           </CardHeader>
           <CardContent>
-            {isLoadingFriends ? (
+            {showLoading ? (
               <div className="flex items-center justify-center p-4">
                 <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                 <span className="ml-2 text-gray-600">
@@ -434,7 +439,7 @@ export default function ComposePage() {
           size="lg"
           className="w-full gap-2"
           disabled={!canSend}
-          loading={isSending}
+          loading={sendMessageMutation.isPending}
           loadingText="전송 중..."
           onClick={handleSend}
         >
