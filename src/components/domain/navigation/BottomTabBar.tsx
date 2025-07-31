@@ -9,6 +9,8 @@ import { usePathname } from "next/navigation";
 import { Home, Users, PlusCircle, Printer, User } from "lucide-react";
 // CSS 클래스 합성 유틸리티 함수
 import { cn } from "@/lib/utils";
+// 탭 최적화 훅
+import { useTabOptimization } from "@/hooks/useTabOptimization";
 
 // 하단 탭바의 탭 정보 배열
 const tabs = [
@@ -43,6 +45,8 @@ const tabs = [
 export function BottomTabBar() {
   // 현재 페이지 경로를 가져옵니다
   const pathname = usePathname();
+  // 탭 최적화 훅
+  const { handleTabHover } = useTabOptimization();
 
   return (
     // 네비게이션 컨테이너 - 화면 하단에 고정
@@ -61,6 +65,8 @@ export function BottomTabBar() {
             <Link
               key={tab.href} // React key prop
               href={tab.href} // 이동할 경로
+              prefetch={true} // 페이지 미리 로드 활성화
+              onMouseEnter={() => handleTabHover(tab.href.replace("/", ""))} // 탭 호버 시 프리페칭
               className={cn(
                 // 기본 스타일 클래스들
                 "flex flex-col items-center space-y-1 px-3 py-2 rounded-lg transition-colors",

@@ -25,7 +25,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuthStore } from "@/stores/auth.store";
 import {
+
   getFriendsList,
+
   acceptFriendRequest,
   rejectFriendRequest,
   sendCloseFriendRequest,
@@ -43,17 +45,23 @@ import {
 } from "@/features/friends/api";
 import type { FriendWithProfile } from "@/features/friends/types";
 import { toast } from "@/hooks/use-toast";
+
 import { supabase } from "@/lib/supabase/client";
+
+
 
 export default function FriendsPage() {
   const router = useRouter();
   const { profile } = useAuthStore();
+
   const [friends, setFriends] = useState<FriendWithProfile[]>([]);
   const [closeFriendRequests, setCloseFriendRequests] = useState<any[]>([]);
   const [sentCloseFriendRequests, setSentCloseFriendRequests] = useState<any[]>(
     []
   );
   const [isLoading, setIsLoading] = useState(true);
+
+
   const [searchQuery, setSearchQuery] = useState("");
   const [updatingFriendIds, setUpdatingFriendIds] = useState<Set<string>>(
     new Set()
@@ -106,6 +114,7 @@ export default function FriendsPage() {
       );
       return "regular_friend"; // 💙 일반친구 (중복 방지)
     }
+
 
     console.log(`💙 [${friendId}] = 일반친구`);
     return "regular_friend"; // 💙 일반친구
@@ -178,6 +187,7 @@ export default function FriendsPage() {
     loadFriends();
   }, [profile]);
 
+
   // 실시간 친구 상태 업데이트 구독
   useEffect(() => {
     if (!profile) return;
@@ -236,6 +246,7 @@ export default function FriendsPage() {
     setUpdatingFriendIds((prev) => new Set(prev).add(friendId));
 
     try {
+
       console.log(`🔄 친한친구 신청 시작: ${profile.id} → ${friendId}`);
 
       // 신청 전 마지막 상태 확인
@@ -429,6 +440,7 @@ export default function FriendsPage() {
         [friendId]: false,
       }));
 
+
       toast({
         title: "친한친구 해제",
         description: "친한친구가 해제되었습니다.",
@@ -482,10 +494,7 @@ export default function FriendsPage() {
     setUpdatingFriendIds((prev) => new Set(prev).add(friendshipId));
 
     try {
-      await acceptFriendRequest(friendshipId);
-
-      // 친구 목록 다시 로드
-      await loadFriends();
+      await acceptFriendMutation.mutateAsync(friendshipId);
 
       toast({
         title: "친구 요청 수락",
@@ -512,10 +521,7 @@ export default function FriendsPage() {
     setUpdatingFriendIds((prev) => new Set(prev).add(friendshipId));
 
     try {
-      await rejectFriendRequest(friendshipId);
-
-      // 친구 목록 다시 로드
-      await loadFriends();
+      await rejectFriendMutation.mutateAsync(friendshipId);
 
       toast({
         title: "친구 요청 거절",
@@ -791,21 +797,15 @@ export default function FriendsPage() {
         )}
 
         {/* 로딩 상태 */}
-        {isLoading && (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-gray-600">친구 목록을 불러오는 중...</p>
-            </CardContent>
-          </Card>
-        )}
+        {showLoading && <FriendListSkeleton />}
 
         {/* 친구 목록 */}
-        {!isLoading &&
+        {!showLoading &&
           (acceptedFriends.length > 0 ||
             receivedRequests.length > 0 ||
             sentRequests.length > 0) && (
             <div className="space-y-4">
+
               {/* 받은 친한친구 신청들 - 노션 스타일 (우선순위 최고) */}
               {closeFriendRequests.length > 0 && (
                 <div className="space-y-4">
@@ -874,6 +874,7 @@ export default function FriendsPage() {
                           </button>
                         </div>
                       </div>
+
                     ))}
                   </div>
                 </div>
@@ -919,55 +920,14 @@ export default function FriendsPage() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {receivedRequests.map((friend) => (
-                      <div
+                      <FriendCard
                         key={friend.id}
-                        className="flex items-center gap-3 p-3 rounded-lg border bg-white hover:bg-gray-50 transition-colors"
-                      >
-                        <Avatar className="h-12 w-12">
-                          <AvatarImage
-                            src={friend.friend_profile.avatar_url || ""}
-                            alt={friend.friend_profile.display_name}
-                          />
-                          <AvatarFallback>
-                            {friend.friend_profile.display_name[0]?.toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-gray-900 truncate">
-                              {friend.friend_profile.display_name}
-                            </h3>
-                            <Badge variant="secondary" className="text-xs">
-                              요청됨
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-gray-600">
-                            @{friend.friend_profile.username}
-                          </p>
-                        </div>
-
-                        {/* 친구 요청 수락/거절 버튼 */}
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleAcceptRequest(friend.id)}
-                            disabled={updatingFriendIds.has(friend.id)}
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            수락
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleRejectRequest(friend.id)}
-                            disabled={updatingFriendIds.has(friend.id)}
-                            className="text-red-600 border-red-200 hover:bg-red-50"
-                          >
-                            거절
-                          </Button>
-                        </div>
-                      </div>
+                        friend={friend}
+                        isUpdating={updatingFriendIds.has(friend.id)}
+                        onCloseFriendToggle={handleCloseFriendToggle}
+                        onAcceptRequest={handleAcceptRequest}
+                        onRejectRequest={handleRejectRequest}
+                      />
                     ))}
                   </CardContent>
                 </Card>
@@ -1039,7 +999,7 @@ export default function FriendsPage() {
           )}
 
         {/* 검색 결과 없음 */}
-        {!isLoading &&
+        {!showLoading &&
           searchQuery &&
           filteredFriends.length === 0 &&
           friends.length > 0 && (
@@ -1055,7 +1015,7 @@ export default function FriendsPage() {
           )}
 
         {/* 친구 없음 */}
-        {!isLoading && friends.length === 0 && (
+        {!showLoading && friends.length === 0 && (
           <Card>
             <CardHeader>
               <CardTitle>내 친구들</CardTitle>
