@@ -107,7 +107,8 @@ export const usePrinterStore = create<PrinterStore>((set, get) => ({
   // BLE 지원 여부 확인
   checkBleSupport: () => {
     const isSupported =
-      "bluetooth" in navigator && "requestDevice" in navigator.bluetooth;
+      "bluetooth" in navigator &&
+      "requestDevice" in (navigator as any).bluetooth;
     set({ isSupported });
 
     if (!isSupported) {
@@ -145,7 +146,7 @@ export const usePrinterStore = create<PrinterStore>((set, get) => ({
       set({ status: "connecting", error: null });
 
       // 실제 BLE 프린터 연결 (하드웨어 준비되면 활성화)
-      const device = await navigator.bluetooth.requestDevice({
+      const device = await (navigator as any).bluetooth.requestDevice({
         // acceptAllDevices: true, // 개발용 - 모든 기기 표시
         filters: [
           { services: ["000018f0-0000-1000-8000-00805f9b34fb"] }, // 예시 UUID

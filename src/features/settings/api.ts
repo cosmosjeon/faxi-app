@@ -173,7 +173,13 @@ export async function createDefaultSettings(
         error.message?.includes("does not exist"))
     ) {
       console.log("🔄 새 필드 오류 감지, 기본 필드만으로 재시도");
-      defaultSettings = baseSettings;
+      defaultSettings = {
+        ...baseSettings,
+        message_notifications: true,
+        marketing_notifications: false,
+        profile_visibility: "public" as const,
+        show_online_status: true,
+      };
 
       console.log("🛡️ 안전한 기본 설정으로 재시도:", defaultSettings);
 
