@@ -48,6 +48,7 @@ import { useBlePrinter } from "@/hooks/useBlePrinter";
 import { toast } from "@/hooks/use-toast";
 import { CardLoading } from "@/components/ui/page-loading";
 import { messageToasts } from "@/lib/toasts";
+import { useRealtimeDataSync } from "@/hooks/useRealtimeDataSync";
 
 export default function HomePage() {
   const router = useRouter();
@@ -68,9 +69,10 @@ export default function HomePage() {
   const [processingMessages, setProcessingMessages] = useState<Set<string>>(
     new Set()
   );
-  
+
   // 무한 프린트 반복 방지를 위한 플래그
-  const [hasHandledQueuedMessages, setHasHandledQueuedMessages] = useState(false);
+  const [hasHandledQueuedMessages, setHasHandledQueuedMessages] =
+    useState(false);
 
   // 확인 팝업 관련 상태
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -101,6 +103,28 @@ export default function HomePage() {
   };
 
   // 메시지 목록 로드
+  // 📡 실시간 메시지 동기화 (백그라운드에서 자동 새로고침)
+  useRealtimeDataSync({
+    onDataUpdate: async () => {
+      if (!profile) return;
+      console.log("🔄 실시간 메시지 동기화 트리거됨");
+
+      try {
+        const messagesList = await getMessagesList(profile.id);
+        const pendingReceivedMessages = messagesList.filter(
+          (msg) =>
+            msg.receiver_id === profile.id &&
+            (msg.print_status === "pending" || msg.print_status === "queued")
+        );
+        setMessages(pendingReceivedMessages);
+      } catch (error) {
+        console.error("실시간 메시지 동기화 실패:", error);
+      }
+    },
+    syncTypes: ["messages"],
+    enabled: !!profile,
+  });
+
   const loadMessages = useCallback(async () => {
     if (!profile) return;
 
@@ -484,7 +508,10 @@ export default function HomePage() {
     }
 
     // 이미 처리된 메시지는 다시 처리하지 않음
-    if (messageToProcess.print_status !== "pending" && messageToProcess.print_status !== "queued") {
+    if (
+      messageToProcess.print_status !== "pending" &&
+      messageToProcess.print_status !== "queued"
+    ) {
       console.log("⚠️ 이미 처리된 메시지:", {
         messageId,
         currentStatus: messageToProcess.print_status,
@@ -505,7 +532,7 @@ export default function HomePage() {
             messageId,
             printerStatus: printer.status,
           });
-          
+
           toast({
             title: "프린터 연결 필요",
             description: "프린터를 연결한 후 다시 시도해주세요.",
@@ -519,7 +546,6 @@ export default function HomePage() {
       await updateMessagePrintStatus(messageId, status);
 
       if (action === "approve") {
-
         // 프린트 승인 시 실제 프린터로 전송
         try {
           await printer.printMessage({
@@ -546,7 +572,7 @@ export default function HomePage() {
           // 프린트 실패 시 상태를 다시 pending으로 되돌리기
           try {
             await updateMessagePrintStatus(messageId, "pending");
-            
+
             // 메시지를 다시 UI에 표시 (pending 상태로)
             setMessages((prev) => [
               { ...messageToProcess, print_status: "pending" },
@@ -563,7 +589,7 @@ export default function HomePage() {
               variant: "destructive",
             });
           }
-          
+
           // 프린트 실패 시 함수 종료
           return;
         }
@@ -708,7 +734,11 @@ export default function HomePage() {
       timestamp: new Date().toLocaleTimeString(),
     });
 
-    if (!profile || printer.status !== "connected" || hasHandledQueuedMessages) {
+    if (
+      !profile ||
+      printer.status !== "connected" ||
+      hasHandledQueuedMessages
+    ) {
       console.log("🔍 프린터 연결 확인 - 조건 불만족:", {
         profile: !!profile,
         printer_status: printer.status,

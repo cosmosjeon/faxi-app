@@ -8,8 +8,8 @@ export default function PrinterCheck() {
 
   useEffect(() => {
     // 프린터 연결 상태 확인 (백그라운드에서)
-    printer.isConnected();
-  }, [printer]);
+    console.log("Printer connection status:", printer.isConnected);
+  }, [printer.isConnected]);
 
   return null;
 }

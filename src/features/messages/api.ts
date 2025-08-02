@@ -315,18 +315,36 @@ export async function getQueuedMessages(userId: string): Promise<
       lcd_teaser: item.lcd_teaser,
       print_status: item.print_status as "queued",
       created_at: item.created_at,
-      sender_display_name: item.sender?.display_name || "Unknown",
-      sender_avatar_url: item.sender?.avatar_url || null,
+      sender_display_name: (() => {
+        try {
+          if (Array.isArray(item.sender) && item.sender.length > 0) {
+            return (item.sender[0] as any)?.display_name || "Unknown";
+          }
+          return (item.sender as any)?.display_name || "Unknown";
+        } catch {
+          return "Unknown";
+        }
+      })(),
+      sender_avatar_url: (() => {
+        try {
+          if (Array.isArray(item.sender) && item.sender.length > 0) {
+            return (item.sender[0] as any)?.avatar_url || null;
+          }
+          return (item.sender as any)?.avatar_url || null;
+        } catch {
+          return null;
+        }
+      })(),
     }));
 
     return transformedData;
   } catch (error) {
     console.error("❌ 대기 중인 메시지 조회 실패:", {
       error,
-      message: error?.message,
-      details: error?.details,
-      hint: error?.hint,
-      code: error?.code,
+      message: (error as any)?.message,
+      details: (error as any)?.details,
+      hint: (error as any)?.hint,
+      code: (error as any)?.code,
     });
 
     // 안전하게 빈 배열 반환

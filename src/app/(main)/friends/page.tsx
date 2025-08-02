@@ -44,6 +44,7 @@ import {
 import type { FriendWithProfile } from "@/features/friends/types";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase/client";
+import { useRealtimeDataSync } from "@/hooks/useRealtimeDataSync";
 
 export default function FriendsPage() {
   const router = useRouter();
@@ -560,14 +561,7 @@ export default function FriendsPage() {
             statusText: "친한친구 신청 대기중",
             statusColor: "text-orange-600",
           };
-        case "received_request":
-          return {
-            borderColor: "border-blue-200",
-            bgColor: "bg-blue-50",
-            icon: <Mail size={12} className="text-blue-500" />,
-            statusText: "친한친구 신청을 보냈어요",
-            statusColor: "text-blue-600",
-          };
+
         default:
           return {
             borderColor: "border-gray-200",
@@ -613,32 +607,7 @@ export default function FriendsPage() {
               신청 취소
             </button>
           );
-        case "received_request":
-          const receivedRequest = closeFriendRequests.find(
-            (req) => req.requester_profile?.id === friend.friend_id
-          );
-          return (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() =>
-                  receivedRequest &&
-                  handleAcceptCloseFriendRequest(receivedRequest.id)
-                }
-                className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors"
-              >
-                수락
-              </button>
-              <button
-                onClick={() =>
-                  receivedRequest &&
-                  handleRejectCloseFriendRequest(receivedRequest.id)
-                }
-                className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-              >
-                거절
-              </button>
-            </div>
-          );
+
         default:
           return (
             <div className="flex items-center gap-2">
@@ -745,6 +714,13 @@ export default function FriendsPage() {
   ).length;
   const closeFriendRequestsCount = closeFriendRequests.length;
   const sentCloseFriendRequestsCount = sentCloseFriendRequests.length;
+
+  // 📡 실시간 데이터 동기화 (백그라운드에서 자동 새로고침)
+  useRealtimeDataSync({
+    onDataUpdate: loadFriends,
+    syncTypes: ["friendships", "close_friends"],
+    enabled: !!profile,
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
