@@ -68,6 +68,9 @@ export default function HomePage() {
   const [processingMessages, setProcessingMessages] = useState<Set<string>>(
     new Set()
   );
+  
+  // 무한 프린트 반복 방지를 위한 플래그
+  const [hasHandledQueuedMessages, setHasHandledQueuedMessages] = useState(false);
 
   // 확인 팝업 관련 상태
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -467,78 +470,106 @@ export default function HomePage() {
     action: "approve" | "reject",
     isAutomatic: boolean = false
   ) => {
+    // 중복 처리 방지 - 이미 처리 중인 메시지는 무시
+    if (processingMessages.has(messageId)) {
+      console.log("⚠️ 메시지 중복 처리 방지:", messageId);
+      return;
+    }
+
+    // 처리할 메시지 찾기
+    const messageToProcess = messages.find((msg) => msg.id === messageId);
+    if (!messageToProcess) {
+      console.log("⚠️ 처리할 메시지를 찾을 수 없음:", messageId);
+      return;
+    }
+
+    // 이미 처리된 메시지는 다시 처리하지 않음
+    if (messageToProcess.print_status !== "pending" && messageToProcess.print_status !== "queued") {
+      console.log("⚠️ 이미 처리된 메시지:", {
+        messageId,
+        currentStatus: messageToProcess.print_status,
+      });
+      return;
+    }
+
     setProcessingMessages((prev) => new Set(prev).add(messageId));
 
     try {
-      const status = action === "approve" ? "approved" : "failed";
-      await updateMessagePrintStatus(messageId, status);
-
-      // 로컬 상태에서 해당 메시지 제거 (처리 완료된 메시지는 더 이상 표시하지 않음)
-      setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+      const status = action === "approve" ? "completed" : "failed";
+      console.log(`🔄 메시지 처리 시작: ${messageId} (${action} → ${status})`);
 
       if (action === "approve") {
-        // 프린트 승인 시 실제 프린터로 전송
-        const message = messages.find((msg) => msg.id === messageId);
-        if (message) {
-          try {
-            await printer.printMessage({
-              text: message.content || undefined,
-              imageUrl: message.image_url || undefined,
-              lcdTeaser: message.lcd_teaser || undefined,
-              senderName: message.sender_profile.display_name,
-            });
-
-            console.log("🖨️ 메시지 프린트 작업 추가:", messageId);
-
-            if (!isAutomatic) {
-              toast({
-                title: "프린트 시작",
-                description: `${message.sender_profile.display_name}님의 메시지를 출력합니다.`,
-              });
-            }
-          } catch (printError) {
-            console.error("프린트 작업 추가 실패:", printError);
-
-            // 프린터 연결 실패 시 상태 되돌리기
-            try {
-              const message = messages.find((msg) => msg.id === messageId);
-              let revertStatus: "pending" | "queued" = "pending";
-
-              // 친한친구인지 확인하여 적절한 상태로 되돌리기
-              if (message && profile) {
-                const isCloseFriend = await areCloseFriends(
-                  profile.id,
-                  message.sender_id
-                );
-                revertStatus = isCloseFriend ? "queued" : "pending";
-              }
-
-              await updateMessagePrintStatus(messageId, revertStatus);
-
-              // 해당 메시지를 다시 목록에 추가
-              const failedMessage = messages.find(
-                (msg) => msg.id === messageId
-              );
-              if (failedMessage) {
-                setMessages((prev) => [
-                  { ...failedMessage, print_status: revertStatus },
-                  ...prev,
-                ]);
-              }
-            } catch (statusError) {
-              console.error("메시지 상태 되돌리기 실패:", statusError);
-            }
-
-            // 프린터 연결이 안 된 경우에도 UI 피드백 제공
-            if (!isAutomatic) {
-              toast({
-                title: "프린터 확인 필요",
-                description: "프린터를 연결한 후 다시 시도해주세요.",
-                variant: "destructive",
-              });
-            }
-          }
+        // 프린터 연결 상태 확인
+        if (printer.status !== "connected") {
+          console.log("❌ 프린터가 연결되지 않음 - 프린트 불가:", {
+            messageId,
+            printerStatus: printer.status,
+          });
+          
+          toast({
+            title: "프린터 연결 필요",
+            description: "프린터를 연결한 후 다시 시도해주세요.",
+            variant: "destructive",
+          });
+          return;
         }
+      }
+
+      // DB 상태 업데이트
+      await updateMessagePrintStatus(messageId, status);
+
+      if (action === "approve") {
+
+        // 프린트 승인 시 실제 프린터로 전송
+        try {
+          await printer.printMessage({
+            text: messageToProcess.content || undefined,
+            imageUrl: messageToProcess.image_url || undefined,
+            lcdTeaser: messageToProcess.lcd_teaser || undefined,
+            senderName: messageToProcess.sender_profile.display_name,
+          });
+
+          console.log("🖨️ 메시지 프린트 작업 완료:", messageId);
+
+          // 프린트 성공 후 UI에서 메시지 제거
+          setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+
+          if (!isAutomatic) {
+            toast({
+              title: "프린트 시작",
+              description: `${messageToProcess.sender_profile.display_name}님의 메시지를 출력합니다.`,
+            });
+          }
+        } catch (printError) {
+          console.error("프린트 작업 실패:", printError);
+
+          // 프린트 실패 시 상태를 다시 pending으로 되돌리기
+          try {
+            await updateMessagePrintStatus(messageId, "pending");
+            
+            // 메시지를 다시 UI에 표시 (pending 상태로)
+            setMessages((prev) => [
+              { ...messageToProcess, print_status: "pending" },
+              ...prev.filter((msg) => msg.id !== messageId),
+            ]);
+          } catch (revertError) {
+            console.error("메시지 상태 되돌리기 실패:", revertError);
+          }
+
+          if (!isAutomatic) {
+            toast({
+              title: "프린트 실패",
+              description: "프린트 중 오류가 발생했습니다. 다시 시도해주세요.",
+              variant: "destructive",
+            });
+          }
+          
+          // 프린트 실패 시 함수 종료
+          return;
+        }
+      } else {
+        // 거절의 경우 UI에서 메시지 제거
+        setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
       }
 
       if (!isAutomatic) {
@@ -673,13 +704,15 @@ export default function HomePage() {
       profile: !!profile,
       profile_id: profile?.id,
       printer_status: printer.status,
+      hasHandledQueuedMessages,
       timestamp: new Date().toLocaleTimeString(),
     });
 
-    if (!profile || printer.status !== "connected") {
+    if (!profile || printer.status !== "connected" || hasHandledQueuedMessages) {
       console.log("🔍 프린터 연결 확인 - 조건 불만족:", {
         profile: !!profile,
         printer_status: printer.status,
+        hasHandledQueuedMessages,
       });
       return;
     }
@@ -744,18 +777,28 @@ export default function HomePage() {
       } else {
         console.log("📝 대기 중인 메시지 없음");
       }
+
+      // ✅ 중복 실행 방지를 위한 플래그 설정
+      setHasHandledQueuedMessages(true);
+      console.log("🔒 대기열 처리 완료 - 중복 실행 방지 플래그 설정됨");
     } catch (error) {
       console.error("대기 중인 메시지 처리 실패:", error);
     }
-  }, [profile, printer.status, messages]);
+  }, [profile, printer.status, hasHandledQueuedMessages, messages]);
 
   useEffect(() => {
     // 프린터 상태가 "connected"로 변경될 때만 실행
     if (printer.status === "connected") {
       console.log("⚡ 프린터 연결됨 - useEffect 트리거");
       handlePrinterConnection();
+    } else {
+      // 프린터가 끊기면 플래그 초기화
+      if (hasHandledQueuedMessages) {
+        console.log("🔓 프린터 연결 해제 - 중복 실행 방지 플래그 초기화");
+        setHasHandledQueuedMessages(false);
+      }
     }
-  }, [printer.status, handlePrinterConnection]);
+  }, [printer.status, handlePrinterConnection, hasHandledQueuedMessages]);
 
   // 메시지 시간 포맷
   const formatMessageTime = (createdAt: string) => {
