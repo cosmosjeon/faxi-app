@@ -49,7 +49,6 @@ import { toast } from "@/hooks/use-toast";
 import { CardLoading } from "@/components/ui/page-loading";
 import { messageToasts } from "@/lib/toasts";
 import { useRealtimeDataSync } from "@/hooks/useRealtimeDataSync";
-
 export default function HomePage() {
   const router = useRouter();
   const { profile, signOut } = useAuthStore();
@@ -374,8 +373,8 @@ export default function HomePage() {
       full_message: newMessage,
     });
 
-    // 메시지 목록에 추가
-    setMessages((prev) => [newMessage, ...prev]);
+    // React Query로 메시지 목록 갱신
+    refetchMessages();
 
     // 친한친구 관계 직접 확인 (DB 트리거 디버깅용)
     try {
@@ -465,10 +464,13 @@ export default function HomePage() {
         async (payload) => {
           console.log("📨 Realtime 새 메시지:", payload);
 
-          // 새 메시지 데이터를 완전한 형태로 구성
+          // React Query 캐시 갱신으로 새 메시지 처리
           try {
-            const messagesList = await getMessagesList(profile.id);
-            const newMessage = messagesList.find(
+            // 메시지 목록 즉시 갱신
+            await refetchMessages();
+
+            // 새 메시지 처리 로직 실행
+            const newMessage = allMessages.find(
               (msg) => msg.id === payload.new.id
             );
 
@@ -638,7 +640,6 @@ export default function HomePage() {
     }
     setConfirmDialog({ isOpen: false, message: null });
   };
-
   // 대기 중인 메시지 확인 함수 - 더 상세한 디버깅
   const checkQueuedMessages = useCallback(async () => {
     if (!profile) return;
@@ -976,8 +977,8 @@ export default function HomePage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <CardLoading message="메시지를 불러오는 중..." />
+            {showLoading ? (
+              <MessageListSkeleton />
             ) : messages.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <div className="text-4xl mb-4">📨</div>
@@ -989,82 +990,17 @@ export default function HomePage() {
             ) : (
               <div className="space-y-4">
                 {messages.map((message) => (
-                  <div
+                  <MessageCard
                     key={message.id}
-                    className="border rounded-lg p-4 bg-white hover:bg-gray-50 transition-colors"
-                  >
-                    {/* 메시지 헤더 */}
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage
-                            src={message.sender_profile.avatar_url || ""}
-                            alt={message.sender_profile.display_name}
-                          />
-                          <AvatarFallback className="text-xs">
-                            {message.sender_profile.display_name[0]?.toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium text-sm">
-                            {message.sender_profile.display_name}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {formatMessageTime(message.created_at)}
-                          </p>
-                        </div>
-                      </div>
-                      {getStatusBadge(message.print_status)}
-                    </div>
-
-                    {/* LCD 티저 미리보기만 표시 */}
-                    <div className="mb-3">
-                      {message.lcd_teaser ? (
-                        <div className="bg-gray-900 text-green-400 font-mono text-sm p-3 rounded-lg text-center">
-                          "{message.lcd_teaser}"
-                        </div>
-                      ) : (
-                        <div className="bg-gray-100 text-gray-500 text-sm p-3 rounded-lg text-center">
-                          내용 미리보기 없음
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 액션 버튼 (모든 메시지가 대기중이므로 항상 표시) */}
-                    <div className="flex gap-2 pt-3 border-t">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          handleMessageAction(message.id, "reject")
-                        }
-                        disabled={processingMessages.has(message.id)}
-                        className="flex-1 gap-1"
-                      >
-                        {processingMessages.has(message.id) ? (
-                          <div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <X size={14} />
-                        )}
-                        거절
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          handleMessageAction(message.id, "approve")
-                        }
-                        disabled={processingMessages.has(message.id)}
-                        className="flex-1 gap-1"
-                      >
-                        {processingMessages.has(message.id) ? (
-                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Check size={14} />
-                        )}
-                        프린트
-                      </Button>
-                    </div>
-                  </div>
+                    message={message}
+                    isProcessing={processingMessages.has(message.id)}
+                    onAccept={(messageId) =>
+                      handleMessageAction(messageId, "accept")
+                    }
+                    onReject={(messageId) =>
+                      handleMessageAction(messageId, "reject")
+                    }
+                  />
                 ))}
               </div>
             )}
