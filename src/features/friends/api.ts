@@ -1,5 +1,9 @@
 import { supabase } from "@/lib/supabase/client";
 import { friendToasts } from "@/lib/toasts";
+import { 
+  sendFriendRequestNotification, 
+  sendFriendAcceptNotification 
+} from "@/features/notifications/trigger-notification";
 import type {
   UserProfile,
   Friendship,
@@ -151,6 +155,28 @@ export async function addFriend(
       .single();
 
     if (error) throw error;
+
+    // 친구 요청 알림 발송
+    try {
+      // 발신자 정보 조회
+      const { data: senderProfile } = await supabase
+        .from("user_profiles")
+        .select("display_name")
+        .eq("user_id", currentUserId)
+        .single();
+
+      const senderName = senderProfile?.display_name || "알 수 없는 사용자";
+      
+      await sendFriendRequestNotification(
+        request.friend_id,
+        currentUserId,
+        senderName
+      );
+    } catch (notificationError) {
+      console.error("친구 요청 알림 발송 실패:", notificationError);
+      // 알림 발송 실패는 메인 로직에 영향을 주지 않음
+    }
+
     return data;
   } catch (error) {
     console.error("친구 추가 실패:", error);
@@ -268,6 +294,16 @@ export async function getFriendshipStatus(
  */
 export async function acceptFriendRequest(friendshipId: string): Promise<void> {
   try {
+    // 친구 관계 정보 조회
+    const { data: friendship, error: fetchError } = await supabase
+      .from("friendships")
+      .select("user_id, friend_id")
+      .eq("id", friendshipId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    // 친구 요청 수락
     const { error } = await supabase
       .from("friendships")
       .update({
@@ -277,6 +313,27 @@ export async function acceptFriendRequest(friendshipId: string): Promise<void> {
       .eq("id", friendshipId);
 
     if (error) throw error;
+
+    // 친구 요청 수락 알림 발송
+    try {
+      // 수락한 사용자 정보 조회
+      const { data: accepterProfile } = await supabase
+        .from("user_profiles")
+        .select("display_name")
+        .eq("user_id", friendship.user_id)
+        .single();
+
+      const accepterName = accepterProfile?.display_name || "알 수 없는 사용자";
+      
+      await sendFriendAcceptNotification(
+        friendship.friend_id,
+        friendship.user_id,
+        accepterName
+      );
+    } catch (notificationError) {
+      console.error("친구 요청 수락 알림 발송 실패:", notificationError);
+      // 알림 발송 실패는 메인 로직에 영향을 주지 않음
+    }
   } catch (error) {
     console.error("친구 요청 수락 실패:", error);
     throw new Error("친구 요청을 수락하는데 실패했습니다.");

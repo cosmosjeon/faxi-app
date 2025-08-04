@@ -1,5 +1,10 @@
 import { supabase } from "@/lib/supabase/client";
 import { messageToasts, imageToasts } from "@/lib/toasts";
+import { 
+  sendNewMessageNotification, 
+  sendPrintCompletedNotification, 
+  sendPrintErrorNotification 
+} from "@/features/notifications/trigger-notification";
 import type {
   Message,
   SendMessageRequest,
@@ -174,6 +179,31 @@ export async function sendMessage(
       .single();
 
     if (error) throw error;
+
+    // 새 메시지 알림 발송
+    try {
+      // 발신자 정보 조회
+      const { data: senderProfile } = await supabase
+        .from("user_profiles")
+        .select("display_name")
+        .eq("user_id", senderId)
+        .single();
+
+      const senderName = senderProfile?.display_name || "알 수 없는 사용자";
+      const teaser = request.lcd_teaser || request.content?.slice(0, 20) || "새 메시지";
+      
+      await sendNewMessageNotification(
+        request.receiver_id,
+        senderId,
+        senderName,
+        data.id,
+        teaser
+      );
+    } catch (notificationError) {
+      console.error("메시지 알림 발송 실패:", notificationError);
+      // 알림 발송 실패는 메인 로직에 영향을 주지 않음
+    }
+
     return data;
   } catch (error) {
     console.error("메시지 전송 실패:", error);
@@ -218,6 +248,15 @@ export async function updateMessagePrintStatus(
 ): Promise<void> {
   // 항상 실제 Supabase API 사용 (개발/프로덕션 모드 구분 없이)
   try {
+    // 메시지 정보 조회 (알림 발송용)
+    const { data: message, error: fetchError } = await supabase
+      .from("messages")
+      .select("sender_id, receiver_id")
+      .eq("id", messageId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
     const updateData: any = {
       print_status: status,
       updated_at: new Date().toISOString(),
@@ -233,6 +272,25 @@ export async function updateMessagePrintStatus(
       .eq("id", messageId);
 
     if (error) throw error;
+
+    // 프린트 상태에 따른 알림 발송
+    try {
+      if (status === "completed") {
+        await sendPrintCompletedNotification(
+          message.sender_id,
+          messageId
+        );
+      } else if (status === "error") {
+        await sendPrintErrorNotification(
+          message.sender_id,
+          "프린트 중 오류가 발생했습니다",
+          messageId
+        );
+      }
+    } catch (notificationError) {
+      console.error("프린트 상태 알림 발송 실패:", notificationError);
+      // 알림 발송 실패는 메인 로직에 영향을 주지 않음
+    }
   } catch (error) {
     console.error("메시지 상태 업데이트 실패:", error);
     throw new Error("메시지 상태 업데이트에 실패했습니다.");

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useAuthStore } from "@/stores/auth.store";
 import { useToast } from "@/hooks/use-toast";
+import { NotificationStatus } from "@/components/domain/notifications/NotificationStatus";
 import {
   getUserSettings,
   updateNotificationSettings,
@@ -309,6 +310,9 @@ export default function NotificationSettingsPage() {
             </div>
           </div>
         </div>
+
+        {/* 알림 권한 상태 */}
+        <NotificationStatus showDetails={true} />
 
         {/* 알림 설정 */}
         <Card>

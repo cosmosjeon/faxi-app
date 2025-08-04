@@ -13,6 +13,8 @@ import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 // 인증 상태 관리 Provider
 import { AuthProvider } from "@/components/auth-provider";
+// 알림 권한 관리 Provider
+import { NotificationProvider } from "@/components/providers/NotificationProvider";
 
 // QueryClient 인스턴스를 생성하는 함수
 function makeQueryClient() {
@@ -59,10 +61,13 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         {/* 인증 상태 관리 Provider */}
         <AuthProvider>
-          {/* 실제 페이지 내용 */}
-          {children}
-          {/* 토스트 알림 표시 영역 */}
-          <Toaster />
+          {/* 알림 권한 관리 Provider */}
+          <NotificationProvider autoRequest={true} delay={5000}>
+            {/* 실제 페이지 내용 */}
+            {children}
+            {/* 토스트 알림 표시 영역 */}
+            <Toaster />
+          </NotificationProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>
