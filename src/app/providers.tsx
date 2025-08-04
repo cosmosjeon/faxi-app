@@ -23,6 +23,11 @@ function makeQueryClient() {
       queries: {
         // SSR에서 클라이언트로 즉시 재요청하는 것을 방지하기 위한 설정
         staleTime: 60 * 1000, // 60초 동안 데이터를 "신선"하다고 간주
+        gcTime: 5 * 60 * 1000, // 5분 후 가비지 컬렉션
+        refetchOnWindowFocus: false, // 윈도우 포커스시 자동 갱신 비활성화
+        refetchOnReconnect: true, // 네트워크 재연결시 갱신
+        retry: 3, // 실패시 3번 재시도
+        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // 지수 백오프
       },
     },
   });
