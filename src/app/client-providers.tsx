@@ -13,21 +13,30 @@ import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 // 인증 상태 관리 Provider
 import { AuthProvider } from "@/components/auth-provider";
-// 실시간 기능 Provider
-import { RealtimeProvider } from "@/components/RealtimeProvider";
 
 // QueryClient 인스턴스를 생성하는 함수
 function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        // SSR에서 클라이언트로 즉시 재요청하는 것을 방지하기 위한 설정
-        staleTime: 60 * 1000, // 60초 동안 데이터를 "신선"하다고 간주
-        gcTime: 5 * 60 * 1000, // 5분 후 가비지 컬렉션
+        // 캐싱 최적화
+        staleTime: 5 * 60 * 1000, // 5분 동안 데이터를 "신선"하다고 간주
+        gcTime: 10 * 60 * 1000, // 10분 후 가비지 컬렉션
         refetchOnWindowFocus: false, // 윈도우 포커스시 자동 갱신 비활성화
         refetchOnReconnect: true, // 네트워크 재연결시 갱신
-        retry: 3, // 실패시 3번 재시도
+        retry: (failureCount, error: any) => {
+          // HTTP 404/403 등은 재시도하지 않음
+          if (error?.status === 404 || error?.status === 403) return false;
+          return failureCount < 3;
+        },
         retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // 지수 백오프
+        // 네트워크 상태에 따른 최적화
+        networkMode: "offlineFirst",
+      },
+      mutations: {
+        retry: 1,
+        // 네트워크 상태에 따른 최적화
+        networkMode: "offlineFirst",
       },
     },
   });
@@ -50,7 +59,7 @@ function getQueryClient() {
 }
 
 // 모든 전역 상태 관리자들을 감싸는 최상위 Provider 컴포넌트
-export default function Providers({ children }: { children: React.ReactNode }) {
+export function ClientProviders({ children }: { children: React.ReactNode }) {
   // QueryClient 인스턴스 가져오기
   const queryClient = getQueryClient();
 
@@ -66,11 +75,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         {/* 인증 상태 관리 Provider */}
         <AuthProvider>
-          {/* 실시간 기능 Provider (백그라운드에서 실시간 동기화) */}
-          <RealtimeProvider>
-            {/* 실제 페이지 내용 */}
-            {children}
-          </RealtimeProvider>
+          {/* 실제 페이지 내용 */}
+          {children}
           {/* 토스트 알림 표시 영역 */}
           <Toaster />
         </AuthProvider>

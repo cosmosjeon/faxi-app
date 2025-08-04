@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bluetooth,
@@ -40,10 +40,19 @@ import {
 } from "@/components/ui/dialog";
 import { useBlePrinter } from "@/hooks/useBlePrinter";
 import { toast } from "@/hooks/use-toast";
+import { useAuthStore } from "@/stores/auth.store";
+import {
+  getQueuedMessages,
+  updateMessagePrintStatus,
+} from "@/features/messages/api";
 
 export default function PrinterPage() {
   const router = useRouter();
   const printer = useBlePrinter();
+  const { profile } = useAuthStore();
+  
+  // 무한 프린트 반복 방지를 위한 플래그
+  const [hasHandledQueuedMessages, setHasHandledQueuedMessages] = useState(false);
 
   // 상태별 아이콘
   const getStatusIcon = () => {
@@ -96,6 +105,81 @@ export default function PrinterPage() {
         return "text-gray-600";
     }
   };
+
+  // 프린터 연결 시 대기 중인 메시지 자동 처리
+  const handleQueuedMessages = useCallback(async () => {
+    if (!profile || printer.status !== "connected" || hasHandledQueuedMessages) return;
+
+    try {
+      console.log("🖨️ 프린터 페이지 - 프린터 연결됨, 대기 중인 메시지 확인");
+      const queuedMessages = await getQueuedMessages(profile.id);
+
+      console.log("📊 프린터 페이지 - 대기 중인 메시지:", {
+        count: queuedMessages.length,
+        messages: queuedMessages.map((msg) => ({
+          id: msg.id,
+          sender: msg.sender_display_name,
+        })),
+      });
+
+      if (queuedMessages.length > 0) {
+        toast({
+          title: "대기 중인 메시지 자동 프린트",
+          description: `${queuedMessages.length}개의 친한친구 메시지를 자동으로 출력합니다.`,
+        });
+
+        // 대기 중인 메시지들을 순차적으로 프린트
+        for (const queuedMessage of queuedMessages) {
+          try {
+            console.log(
+              `🔄 대기 메시지 프린트 시작: ${queuedMessage.id} (${queuedMessage.sender_display_name})`
+            );
+
+            // 메시지 프린트 실행
+            await printer.printMessage({
+              text: queuedMessage.content || undefined,
+              imageUrl: queuedMessage.image_url || undefined,
+              lcdTeaser: queuedMessage.lcd_teaser || undefined,
+              senderName: queuedMessage.sender_display_name,
+            });
+
+            // 메시지 상태를 completed로 업데이트
+            await updateMessagePrintStatus(queuedMessage.id, "completed");
+            console.log(`✅ 대기 메시지 프린트 완료: ${queuedMessage.id}`);
+          } catch (error) {
+            console.error(
+              `❌ 대기 메시지 프린트 실패: ${queuedMessage.id}`,
+              error
+            );
+            // 실패한 메시지는 상태를 failed로 업데이트
+            await updateMessagePrintStatus(queuedMessage.id, "failed");
+          }
+        }
+      } else {
+        console.log("📝 프린터 페이지 - 대기 중인 메시지 없음");
+      }
+
+      // ✅ 중복 실행 방지를 위한 플래그 설정
+      setHasHandledQueuedMessages(true);
+      console.log("🔒 프린터 페이지 - 대기열 처리 완료, 중복 실행 방지 플래그 설정됨");
+    } catch (error) {
+      console.error("❌ 프린터 페이지 - 대기 중인 메시지 처리 실패:", error);
+    }
+  }, [profile, printer.status, hasHandledQueuedMessages, printer.printMessage]);
+
+  // 프린터 연결 상태 변화 감지
+  useEffect(() => {
+    if (printer.status === "connected") {
+      console.log("⚡ 프린터 페이지 - 프린터 연결됨, 대기 메시지 처리 시작");
+      handleQueuedMessages();
+    } else {
+      // 프린터가 끊기면 플래그 초기화
+      if (hasHandledQueuedMessages) {
+        console.log("🔓 프린터 페이지 - 프린터 연결 해제, 중복 실행 방지 플래그 초기화");
+        setHasHandledQueuedMessages(false);
+      }
+    }
+  }, [printer.status, handleQueuedMessages, hasHandledQueuedMessages]);
 
   // 배터리 상태 색상
   const getBatteryColor = (level?: number) => {

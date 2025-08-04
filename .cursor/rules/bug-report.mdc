@@ -1,9 +1,0 @@
----
-alwaysApply: false
----
-# Bug Report Debrief
-
-- **All mistakes made during development, the reasons behind them, and concrete measures to prevent them should be documented.**
-- **Be mindful not to repeat the same mistakes again.**
-- **All bugs must be documented and uploaded to this file without exception.
-Whenever a bug occurs, it must be recorded in this file.**

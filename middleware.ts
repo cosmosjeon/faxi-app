@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function middleware(request: NextRequest) {
@@ -15,33 +15,51 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  const supabase = createClient(
+  // 서버용 Supabase 클라이언트 생성
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
   );
-
-  // 쿠키에서 세션 정보 가져오기
-  const token =
-    request.cookies.get("sb-access-token")?.value ||
-    request.cookies.get("sb-tkzfnkuwflexqcurngrr-auth-token")?.value;
 
   let isAuthenticated = false;
 
-  if (token) {
-    try {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser(token);
-      isAuthenticated = !!user && !error;
-    } catch (error) {
-      console.error("토큰 검증 실패:", error);
-      isAuthenticated = false;
+  try {
+    // Supabase의 표준 세션 관리 사용
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
+
+    isAuthenticated = !!session && !error;
+
+    if (error) {
+      console.error("세션 조회 실패:", error);
     }
+  } catch (error) {
+    console.error("인증 확인 실패:", error);
+    isAuthenticated = false;
   }
 
   // 보호된 라우트 정의
-  const protectedRoutes = ["/friends", "/messages", "/settings", "/profile", "/home"];
+  const protectedRoutes = [
+    "/friends",
+    "/messages",
+    "/settings",
+    "/profile",
+    "/home",
+  ];
   const authRoutes = ["/login"];
 
   const isProtectedRoute = protectedRoutes.some((route) =>

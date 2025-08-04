@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        // 🔄 실제 Supabase 세션 확인 (개발/프로덕션 모두)
+        // 🔄 세션 확인 - 페이지 새로고침 시에도 안정적으로 세션 복원
         const {
           data: { session },
           error,
@@ -56,18 +56,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        if (session) {
-          console.log("세션 발견:", session.user.id);
+        if (session && session.user) {
+          console.log("✅ 세션 복원 성공:", session.user.id);
           setSession(session);
           setUser(session.user);
-          try {
-            await fetchProfile();
-          } catch (profileError) {
-            console.error("프로필 조회 실패:", profileError);
-            // 프로필이 없어도 세션은 유지
-          }
+
+          // 프로필 조회는 백그라운드에서 실행 (세션 복원과 분리)
+          fetchProfile().catch((profileError) => {
+            console.warn("프로필 조회 실패 (세션은 유지):", profileError);
+          });
         } else {
-          console.log("세션 없음, 상태 초기화");
+          console.log("세션 없음, 초기 상태 설정");
           reset();
         }
       } catch (error) {
@@ -85,24 +84,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event, session?.user?.id);
-      
-      // 무한 루프 방지: 이벤트가 SIGNED_IN이나 SIGNED_OUT일 때만 상태 업데이트
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+      console.log("🔄 Auth state changed:", event, session?.user?.id);
+
+      // 주요 이벤트에만 반응하여 불필요한 처리 방지
+      if (
+        event === "SIGNED_IN" ||
+        event === "SIGNED_OUT" ||
+        event === "TOKEN_REFRESHED"
+      ) {
         setSession(session);
         setUser(session?.user ?? null);
-        
+
         if (session?.user) {
-          try {
-            await fetchProfile();
-          } catch (error) {
-            console.error("프로필 조회 실패:", error);
-            // 프로필이 없어도 세션은 유지
-          }
+          // 프로필 조회는 백그라운드에서 처리
+          fetchProfile().catch((error) => {
+            console.warn("프로필 조회 실패 (세션은 유지):", error);
+          });
         } else {
           reset();
         }
-        
+
         setLoading(false);
         setIsLoading(false);
       }
@@ -113,14 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [
-    setUser,
-    setSession,
-    setLoading,
-    setInitialized,
-    fetchProfile,
-    reset,
-  ]);
+  }, [setUser, setSession, setLoading, setInitialized, fetchProfile, reset]);
 
   return (
     <AuthContext.Provider value={{ isInitialized, isLoading }}>
