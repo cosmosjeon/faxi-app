@@ -1,167 +1,26 @@
-# 📚 Faxi App 프로젝트 가이드
+# 프롬프트 작성시 유의할 것
 
-## 🏗️ 프로젝트 구조 설명
+## 명확하고 구체적으로 요청하기
+AI가 수행할 작업(예: 글쓰기, 요약, 번역 등)을 분명하게 지정하고, 원하는 상세 조건(길이, 어조, 대상 등)을 명확히 전달하세요. 예: "30대 주부를 위한 홈트레이닝 글 1500자, 단계별로 설명해줘"처럼 구체적일수록 정확한 답변이 나옵니다.
 
-```
-faxi-app/
-├── 📁 src/                    # 소스 코드 메인 폴더
-│   ├── 📁 app/                # Next.js App Router (페이지들)
-│   │   ├── 📁 (auth)/         # 인증 관련 페이지들
-│   │   ├── 📁 (main)/         # 메인 앱 페이지들
-│   │   ├── 📁 auth/           # 인증 API 라우트
-│   │   ├── layout.tsx         # 전체 앱 레이아웃
-│   │   ├── page.tsx           # 홈페이지
-│   │   └── providers.tsx      # 전역 상태 관리자들
-│   ├── 📁 components/         # 재사용 가능한 컴포넌트들
-│   │   ├── 📁 domain/         # 비즈니스 로직 컴포넌트
-│   │   └── 📁 ui/             # 기본 UI 컴포넌트들
-│   ├── 📁 features/           # 기능별 모듈
-│   ├── 📁 hooks/              # 커스텀 React 훅들
-│   ├── 📁 lib/                # 유틸리티 함수들
-│   └── 📁 stores/             # 상태 관리 스토어들
-├── 📁 public/                 # 정적 파일들 (이미지, 폰트 등)
-├── 📁 supabase/               # Supabase 설정
-├── package.json               # 프로젝트 설정 및 의존성
-├── next.config.ts            # Next.js 설정
-├── tailwind.config.ts        # Tailwind CSS 설정
-└── tsconfig.json             # TypeScript 설정
-```
+## 역할 부여하기
+AI에게 특정 전문가나 역할을 부여하면, 그 관점에 맞는 전문적이고 깊이 있는 답변이 가능해집니다. 예: "너는 10년 경력의 영양사야"와 같이 역할을 명시해 주세요.
 
-## 📦 라이브러리 설명
+## 예시 제공하기(퓨샷 프롬프팅)
+몇 가지 예시 문장이나 답변을 같이 제시하면 AI가 답변 패턴을 학습해서 더 정교한 결과를 내놓습니다.
 
-### 🎯 핵심 프레임워크
-- **Next.js 15.1.0**: React 기반 풀스택 프레임워크
-- **React 19.0.0**: 사용자 인터페이스 라이브러리
-- **TypeScript 5**: 타입 안전성을 제공하는 JavaScript 확장
+## 간결하면서도 자연스러운 언어 사용
+딱딱한 명령어보다 친구에게 이야기하듯 자연스럽고 간단명료한 문장으로 작성하는 게 좋습니다.
 
-### 🎨 UI & 스타일링
-- **Tailwind CSS**: 유틸리티 우선 CSS 프레임워크
-- **Radix UI**: 접근성이 좋은 UI 컴포넌트 라이브러리
-- **Framer Motion**: 애니메이션 라이브러리
-- **Lucide React**: 아이콘 라이브러리
+## 단계적 요청과 피드백 주기
+처음 프롬프트에 원하는 결과가 완벽하지 않을 수 있으니, AI 답변 후 부족한 부분을 다시 묻거나 쉽고 자세하게 다시 요청하는 반복적 개선이 효과적입니다.
 
-### 🔧 상태 관리 & 데이터
-- **Zustand**: 가벼운 상태 관리 라이브러리
-- **TanStack Query**: 서버 상태 관리 (API 데이터 캐싱)
-- **React Hook Form**: 폼 상태 관리
-- **Zod**: 데이터 검증 라이브러리
+## 출력 형태 구체화하기
+결과를 어떻게 표현해주길 원하는지(예: 표, 목록, 전문 용어 포함 여부 등) 명확히 지시하면 좋은 품질을 얻을 수 있습니다.
 
-### 🌐 백엔드 & API
-- **Supabase**: 백엔드 서비스 (데이터베이스, 인증, 파일 저장)
-- **Axios**: HTTP 클라이언트 (API 요청)
+## 부정어 대신 긍정적 지시 사용하기
+"하지 마라"보다 "이렇게 해라"처럼 긍정적으로 지시하는 게 AI 이해에 더 도움이 됩니다.
 
-### 🛠️ 개발 도구
-- **ESLint**: 코드 품질 검사
-- **PostCSS**: CSS 후처리기
-- **Autoprefixer**: CSS 자동 접두사 추가
+이 밖에도 AI 모델별로 선호하는 프롬프트 형식이 다르고, 계속 실험하고 다듬으며 최적화하는 과정이 필요합니다. 기본적으로는 명확성, 구체성, 자연스러움, 반복 개선을 지키면 좋은 결과를 얻을 수 있습니다.
 
-## 🚀 주요 기능별 구조
-
-### 1. 인증 시스템
-```
-src/
-├── components/auth-provider.tsx    # 인증 상태 관리
-├── app/(auth)/                    # 로그인/회원가입 페이지
-└── lib/supabase/                  # Supabase 클라이언트
-```
-
-### 2. 메시지 시스템
-```
-src/
-├── features/messages/              # 메시지 관련 로직
-├── app/(main)/compose/            # 메시지 작성 페이지
-└── components/domain/              # 메시지 관련 컴포넌트
-```
-
-### 3. 친구 관리
-```
-src/
-├── features/friends/               # 친구 관련 로직
-├── app/(main)/friends/            # 친구 목록/추가 페이지
-└── components/domain/              # 친구 관련 컴포넌트
-```
-
-### 4. 프린터 연동
-```
-src/
-├── hooks/useBlePrinter.ts         # BLE 프린터 훅
-├── app/(main)/printer/            # 프린터 관리 페이지
-└── stores/printer.store.ts        # 프린터 상태 관리
-```
-
-## 📋 라이브러리 상세 설명
-
-### UI 컴포넌트 (Radix UI)
-- **@radix-ui/react-dialog**: 모달 다이얼로그
-- **@radix-ui/react-toast**: 알림 메시지
-- **@radix-ui/react-avatar**: 사용자 프로필 이미지
-- **@radix-ui/react-switch**: 토글 스위치
-- **@radix-ui/react-select**: 선택 박스
-- **@radix-ui/react-dropdown-menu**: 드롭다운 메뉴
-
-### 상태 관리
-- **Zustand**: 전역 상태 관리 (사용자 정보, 프린터 상태 등)
-- **TanStack Query**: 서버 데이터 캐싱 (친구 목록, 메시지 등)
-- **React Hook Form**: 폼 상태 관리 (로그인, 메시지 작성 등)
-
-### 유틸리티
-- **date-fns**: 날짜/시간 처리
-- **clsx**: CSS 클래스 조건부 적용
-- **ts-pattern**: 패턴 매칭 (조건문 대신 사용)
-- **es-toolkit**: 유틸리티 함수 모음
-
-### 개발 도구
-- **ESLint**: 코드 품질 검사
-- **TypeScript**: 타입 안전성
-- **Tailwind CSS**: 스타일링
-- **PostCSS**: CSS 후처리
-
-## 🎯 프로젝트 특징
-
-### 1. 모던 React 패턴
-- App Router 사용 (Next.js 13+)
-- Server Components 활용
-- TypeScript로 타입 안전성 확보
-
-### 2. 접근성 중심
-- Radix UI로 접근성 좋은 컴포넌트
-- 키보드 네비게이션 지원
-- 스크린 리더 호환
-
-### 3. 성능 최적화
-- TanStack Query로 서버 상태 캐싱
-- Next.js의 자동 코드 분할
-- Tailwind CSS로 최적화된 CSS
-
-### 4. 개발자 경험
-- TypeScript로 타입 안전성
-- ESLint로 코드 품질 관리
-- Hot Reload로 빠른 개발
-
-## 🚀 실행 방법
-
-```bash
-# 의존성 설치
-npm install
-
-# 개발 서버 실행
-npm run dev
-
-# 프로덕션 빌드
-npm run build
-
-# 코드 품질 검사
-npm run lint
-```
-
-## 🔧 환경 설정
-
-프로젝트 실행을 위해서는 다음 환경 변수가 필요합니다:
-
-```bash
-# .env.local 파일 생성
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
-
-이 가이드를 통해 프로젝트의 전체적인 구조와 각 라이브러리의 역할을 이해할 수 있습니다! 🎉 
+요약하면, AI에게 명확한 역할과 구체적인 작업 지시를 주고, 예시와 원하는 출력 형태를 포함해 자연스럽고 간결하게 요청하며, 반복적으로 피드백을 주는 방식이 가장 효과적인 AI 프롬프팅 팁입니다.
