@@ -44,6 +44,7 @@ import {
 import type { FriendWithProfile } from "@/features/friends/types";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase/client";
+import { useRealtimeDataSync } from "@/hooks/useRealtimeDataSync";
 
 export default function FriendsPage() {
   const router = useRouter();
@@ -482,10 +483,7 @@ export default function FriendsPage() {
     setUpdatingFriendIds((prev) => new Set(prev).add(friendshipId));
 
     try {
-      await acceptFriendRequest(friendshipId);
-
-      // 친구 목록 다시 로드
-      await loadFriends();
+      await acceptFriendMutation.mutateAsync(friendshipId);
 
       toast({
         title: "친구 요청 수락",
@@ -512,10 +510,7 @@ export default function FriendsPage() {
     setUpdatingFriendIds((prev) => new Set(prev).add(friendshipId));
 
     try {
-      await rejectFriendRequest(friendshipId);
-
-      // 친구 목록 다시 로드
-      await loadFriends();
+      await rejectFriendMutation.mutateAsync(friendshipId);
 
       toast({
         title: "친구 요청 거절",
@@ -560,14 +555,7 @@ export default function FriendsPage() {
             statusText: "친한친구 신청 대기중",
             statusColor: "text-orange-600",
           };
-        case "received_request":
-          return {
-            borderColor: "border-blue-200",
-            bgColor: "bg-blue-50",
-            icon: <Mail size={12} className="text-blue-500" />,
-            statusText: "친한친구 신청을 보냈어요",
-            statusColor: "text-blue-600",
-          };
+
         default:
           return {
             borderColor: "border-gray-200",
@@ -613,32 +601,7 @@ export default function FriendsPage() {
               신청 취소
             </button>
           );
-        case "received_request":
-          const receivedRequest = closeFriendRequests.find(
-            (req) => req.requester_profile?.id === friend.friend_id
-          );
-          return (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() =>
-                  receivedRequest &&
-                  handleAcceptCloseFriendRequest(receivedRequest.id)
-                }
-                className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors"
-              >
-                수락
-              </button>
-              <button
-                onClick={() =>
-                  receivedRequest &&
-                  handleRejectCloseFriendRequest(receivedRequest.id)
-                }
-                className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-              >
-                거절
-              </button>
-            </div>
-          );
+
         default:
           return (
             <div className="flex items-center gap-2">
@@ -746,6 +709,13 @@ export default function FriendsPage() {
   const closeFriendRequestsCount = closeFriendRequests.length;
   const sentCloseFriendRequestsCount = sentCloseFriendRequests.length;
 
+  // 📡 실시간 데이터 동기화 (백그라운드에서 자동 새로고침)
+  useRealtimeDataSync({
+    onDataUpdate: loadFriends,
+    syncTypes: ["friendships", "close_friends"],
+    enabled: !!profile,
+  });
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-md mx-auto space-y-4">
@@ -791,17 +761,10 @@ export default function FriendsPage() {
         )}
 
         {/* 로딩 상태 */}
-        {isLoading && (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-gray-600">친구 목록을 불러오는 중...</p>
-            </CardContent>
-          </Card>
-        )}
+        {showLoading && <FriendListSkeleton />}
 
         {/* 친구 목록 */}
-        {!isLoading &&
+        {!showLoading &&
           (acceptedFriends.length > 0 ||
             receivedRequests.length > 0 ||
             sentRequests.length > 0) && (
@@ -919,55 +882,14 @@ export default function FriendsPage() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {receivedRequests.map((friend) => (
-                      <div
+                      <FriendCard
                         key={friend.id}
-                        className="flex items-center gap-3 p-3 rounded-lg border bg-white hover:bg-gray-50 transition-colors"
-                      >
-                        <Avatar className="h-12 w-12">
-                          <AvatarImage
-                            src={friend.friend_profile.avatar_url || ""}
-                            alt={friend.friend_profile.display_name}
-                          />
-                          <AvatarFallback>
-                            {friend.friend_profile.display_name[0]?.toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-gray-900 truncate">
-                              {friend.friend_profile.display_name}
-                            </h3>
-                            <Badge variant="secondary" className="text-xs">
-                              요청됨
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-gray-600">
-                            @{friend.friend_profile.username}
-                          </p>
-                        </div>
-
-                        {/* 친구 요청 수락/거절 버튼 */}
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleAcceptRequest(friend.id)}
-                            disabled={updatingFriendIds.has(friend.id)}
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            수락
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleRejectRequest(friend.id)}
-                            disabled={updatingFriendIds.has(friend.id)}
-                            className="text-red-600 border-red-200 hover:bg-red-50"
-                          >
-                            거절
-                          </Button>
-                        </div>
-                      </div>
+                        friend={friend}
+                        isUpdating={updatingFriendIds.has(friend.id)}
+                        onCloseFriendToggle={handleCloseFriendToggle}
+                        onAcceptRequest={handleAcceptRequest}
+                        onRejectRequest={handleRejectRequest}
+                      />
                     ))}
                   </CardContent>
                 </Card>
@@ -1039,7 +961,7 @@ export default function FriendsPage() {
           )}
 
         {/* 검색 결과 없음 */}
-        {!isLoading &&
+        {!showLoading &&
           searchQuery &&
           filteredFriends.length === 0 &&
           friends.length > 0 && (
@@ -1055,7 +977,7 @@ export default function FriendsPage() {
           )}
 
         {/* 친구 없음 */}
-        {!isLoading && friends.length === 0 && (
+        {!showLoading && friends.length === 0 && (
           <Card>
             <CardHeader>
               <CardTitle>내 친구들</CardTitle>

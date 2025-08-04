@@ -24,8 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuthStore } from "@/stores/auth.store";
-import { getFriendsList } from "@/features/friends/api";
-import { sendMessage, validateMessageForm } from "@/features/messages/api";
+import { validateMessageForm } from "@/features/messages/api";
 import type { FriendWithProfile } from "@/features/friends/types";
 import type {
   MessageFormData,
@@ -40,12 +39,14 @@ export default function ComposePage() {
   const { profile } = useAuthStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+
   // 상태 관리
   const [friends, setFriends] = useState<FriendWithProfile[]>([]);
   const [isLoadingFriends, setIsLoadingFriends] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [editMode, setEditMode] = useState<"compose" | "imageEdit">("compose");
   const [originalImageFile, setOriginalImageFile] = useState<File | null>(null);
+
 
   // 폼 데이터
   const [formData, setFormData] = useState<MessageFormData>({
@@ -61,33 +62,7 @@ export default function ComposePage() {
   // 이미지 미리보기
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
-  // 친구 목록 로드
-  const loadFriends = async () => {
-    if (!profile) return;
-
-    setIsLoadingFriends(true);
-    try {
-      const friendsList = await getFriendsList(profile.id);
-      // 승인된 친구만 표시
-      const acceptedFriends = friendsList.filter(
-        (friend) => friend.status === "accepted"
-      );
-      setFriends(acceptedFriends);
-    } catch (error) {
-      console.error("친구 목록 로드 실패:", error);
-      toast({
-        title: "로드 실패",
-        description: "친구 목록을 불러오는데 실패했습니다.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingFriends(false);
-    }
-  };
-
-  useEffect(() => {
-    loadFriends();
-  }, [profile]);
+  // React Query가 자동으로 친구 목록을 로드하므로 useEffect 제거
 
   // 텍스트 입력 핸들러
   const handleContentChange = (value: string) => {
@@ -116,23 +91,33 @@ export default function ComposePage() {
   };
 
   // 이미지 선택 핸들러
-  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // 파일 크기 및 타입 검사
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
-
-    if (file.size > maxSize) {
+    // 파일 유효성 검사
+    const validation = validateImageFile(file);
+    if (!validation.isValid) {
       imageToasts.uploadError();
+      toast({
+        title: "이미지 업로드 실패",
+        description: validation.error,
+        variant: "destructive",
+      });
       return;
     }
 
-    if (!allowedTypes.includes(file.type)) {
-      imageToasts.uploadError();
-      return;
-    }
+    try {
+      // 이미지 압축
+      const compressedFile = await compressImage(file, {
+        maxWidth: 800,
+        maxHeight: 600,
+        quality: 0.8,
+        format: "jpeg",
+      });
+
 
     // 원본 파일 저장하고 편집 모드로 전환
     setOriginalImageFile(file);
@@ -203,17 +188,14 @@ export default function ComposePage() {
       return;
     }
 
-    setIsSending(true);
     try {
-      await sendMessage(
-        {
-          receiver_id: formData.receiver_id,
-          content: formData.content || undefined,
-          image_file: formData.image_file || undefined,
-          lcd_teaser: formData.lcd_teaser || undefined,
-        },
-        profile.id
-      );
+      await sendMessageMutation.mutateAsync({
+        receiver_id: formData.receiver_id,
+        content: formData.content || undefined,
+        image_file: formData.image_file || undefined,
+        lcd_teaser: formData.lcd_teaser || undefined,
+        sender_id: profile.id,
+      });
 
       messageToasts.sendSuccess();
 
@@ -234,8 +216,6 @@ export default function ComposePage() {
     } catch (error) {
       console.error("메시지 전송 실패:", error);
       messageToasts.sendError();
-    } finally {
-      setIsSending(false);
     }
   };
 
@@ -248,7 +228,7 @@ export default function ComposePage() {
   const canSend =
     formData.receiver_id &&
     (formData.content.trim() || formData.image_file) &&
-    !isSending &&
+    !sendMessageMutation.isPending &&
     Object.keys(errors).length === 0;
 
   return (
@@ -278,9 +258,11 @@ export default function ComposePage() {
           </div>
         </div>
 
+
         {/* 이미지 편집 모드 */}
         {editMode === "imageEdit" && originalImageFile && (
           <Card>
+
             <CardContent className="p-4">
               <ImageEditor
                 image={originalImageFile}
