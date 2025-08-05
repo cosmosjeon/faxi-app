@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { printerToasts } from "@/lib/toasts";
+import { logger } from "@/features/utils";
 
 // 프린터 연결 상태 타입
 export type PrinterStatus =
@@ -25,31 +26,19 @@ export interface MockDevice {
   paperStatus: "ok" | "low" | "empty";
 }
 
-// Mock 기기 목록
+// Mock 기기 목록 (개발용)
 const MOCK_DEVICES: MockDevice[] = [
   {
     id: "mock-printer-001",
-    name: "Pensieve Printer #001",
+    name: "FAXI Printer #001",
     batteryLevel: 85,
     paperStatus: "ok",
   },
   {
     id: "mock-printer-002",
-    name: "Pensieve Printer #002",
+    name: "FAXI Printer #002",
     batteryLevel: 62,
     paperStatus: "low",
-  },
-  {
-    id: "mock-printer-003",
-    name: "Studio Printer #003",
-    batteryLevel: 91,
-    paperStatus: "ok",
-  },
-  {
-    id: "mock-printer-004",
-    name: "Mini Thermal #004",
-    batteryLevel: 28,
-    paperStatus: "ok",
   },
 ];
 
@@ -156,7 +145,7 @@ export const usePrinterStore = create<PrinterStore>((set, get) => ({
         optionalServices: ["battery_service", "device_information"],
       });
 
-      console.log("🔍 BLE 기기 선택됨:", device.name);
+      logger.info("🔍 BLE 기기 선택됨:", device.name);
 
       const server = await device.gatt?.connect();
       if (!server) {
@@ -175,7 +164,7 @@ export const usePrinterStore = create<PrinterStore>((set, get) => ({
       });
 
       printerToasts.connectSuccess(printerInfo.name);
-      console.log("🖨️ 프린터 연결 완료:", printerInfo);
+      logger.info("🖨️ 프린터 연결 완료:", printerInfo);
     } catch (error) {
       console.error("프린터 연결 실패:", error);
       printerToasts.connectError();
@@ -207,7 +196,7 @@ export const usePrinterStore = create<PrinterStore>((set, get) => ({
     });
 
     printerToasts.connectSuccess(mockPrinter.name);
-    console.log("🖨️ Mock 프린터 연결 완료:", mockPrinter);
+    logger.info("🖨️ Mock 프린터 연결 완룼:", mockPrinter);
   },
 
   // 기기 선택 취소
@@ -230,7 +219,7 @@ export const usePrinterStore = create<PrinterStore>((set, get) => ({
         connectedPrinter: null,
         error: null,
       });
-      console.log("🔌 Mock 프린터 연결 해제");
+      logger.info("🔌 Mock 프린터 연결 해제");
       return;
     }
 
@@ -250,7 +239,7 @@ export const usePrinterStore = create<PrinterStore>((set, get) => ({
     }
   },
 
-  // 프린트 작업 추가
+  // 프린트 작업 추가 (메모리 누수 방지)
   addPrintJob: (type: PrintJob["type"], data: string | ArrayBuffer) => {
     const jobId = `print-${Date.now()}-${Math.random()
       .toString(36)
@@ -264,11 +253,23 @@ export const usePrinterStore = create<PrinterStore>((set, get) => ({
       createdAt: new Date().toISOString(),
     };
 
-    set((state) => ({
-      printQueue: [...state.printQueue, newJob],
-    }));
+    const MAX_QUEUE_SIZE = 50;
+    const MAX_COMPLETED_JOBS = 10;
 
-    console.log("📄 프린트 작업 추가:", newJob);
+    set((state) => {
+      const newQueue = [...state.printQueue, newJob];
+      
+      // 완료된 작업은 최대 10개만 유지
+      const completedJobs = newQueue.filter(job => job.status === 'completed');
+      const otherJobs = newQueue.filter(job => job.status !== 'completed');
+      
+      const trimmedCompleted = completedJobs.slice(-MAX_COMPLETED_JOBS);
+      const finalQueue = [...otherJobs, ...trimmedCompleted].slice(-MAX_QUEUE_SIZE);
+      
+      return { printQueue: finalQueue };
+    });
+
+    logger.info("📄 프린트 작업 추가:", newJob);
 
     // 자동으로 프린트 큐 처리 시작
     get().processPrintQueue();
@@ -302,7 +303,7 @@ export const usePrinterStore = create<PrinterStore>((set, get) => ({
         ),
       }));
 
-      console.log("🖨️ 프린트 작업 처리 시작:", jobToProcess);
+      logger.info("🖨️ 프린트 작업 처리 시작:", jobToProcess);
 
       if (isDevelopmentMode) {
         // Mock 프린트 처리 (3초 시뮬레이션)
@@ -321,7 +322,7 @@ export const usePrinterStore = create<PrinterStore>((set, get) => ({
           ),
         }));
 
-        console.log("✅ Mock 프린트 완료:", jobToProcess.id);
+        logger.info("✅ Mock 프린트 완료:", jobToProcess.id);
       } else {
         // 실제 프린트 처리 로직 (하드웨어 준비되면 구현)
         await new Promise((resolve) => setTimeout(resolve, 1000));

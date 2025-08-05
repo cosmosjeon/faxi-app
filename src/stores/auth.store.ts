@@ -1,9 +1,7 @@
-// Zustand 라이브러리를 가져옵니다 (가벼운 상태 관리)
 import { create } from "zustand";
-// Supabase의 타입들을 가져옵니다
 import { User, Session } from "@supabase/supabase-js";
-// Supabase 클라이언트를 가져옵니다
 import { supabase } from "@/lib/supabase/client";
+import { logger } from "@/features/utils";
 
 // 사용자 프로필 정보의 타입 정의
 interface UserProfile {
@@ -64,7 +62,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     try {
       // 리다이렉트 URL 설정 (인증 완료 후 돌아올 주소)
       const redirectUrl = `${window.location.origin}/auth/callback`;
-      console.log("🔄 OAuth Debug:", {
+      logger.info("🔄 OAuth Debug:", {
         provider,
         redirectUrl,
         origin: window.location.origin,
@@ -83,17 +81,17 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         },
       });
 
-      console.log("🔄 OAuth Result:", data);
+      logger.info("🔄 OAuth Result:", data);
 
       if (error) {
-        console.error("❌ OAuth Error:", error);
+        logger.error("❌ OAuth Error:", error);
         throw error;
       }
 
       // Implicit 플로우에서는 리다이렉트가 자동으로 시작됨
       // 실제 인증 처리는 /auth/callback에서 이루어짐
     } catch (error) {
-      console.error("❌ OAuth Exception:", error);
+      logger.error("❌ OAuth Exception:", error);
       throw error;
     } finally {
       set({ isLoading: false }); // 로딩 상태 종료
@@ -116,7 +114,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         isLoading: false,
       });
     } catch (error) {
-      console.error("로그아웃 실패:", error);
+      logger.error("로그아웃 실패:", error);
       set({ isLoading: false });
       throw error;
     }
@@ -147,7 +145,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         set({ profile: null });
       }
     } catch (error) {
-      console.error("프로필 조회 실패:", error);
+      logger.error("프로필 조회 실패:", error);
       set({ profile: null });
     }
   },

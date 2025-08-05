@@ -1,11 +1,8 @@
-// 이 파일은 클라이언트 컴포넌트입니다 (브라우저에서 실행)
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { useAuthStore } from "@/stores/auth.store";
 import { supabase } from "@/lib/supabase/client";
-
-// 인증 컨텍스트 생성
 interface AuthContextType {
   isInitialized: boolean;
   isLoading: boolean;

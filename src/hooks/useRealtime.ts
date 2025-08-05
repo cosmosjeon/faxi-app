@@ -14,6 +14,7 @@ import {
   CloseFriendRequestPayload,
 } from "@/lib/supabase/realtime";
 import { useRealtimeStore } from "@/stores/realtimeStore";
+import { logger } from "@/features/utils";
 
 interface UseRealtimeProps {
   userId?: string;
@@ -39,7 +40,7 @@ export const useRealtime = ({
   // 새 메시지 처리
   const handleNewMessage = useCallback(
     (payload: MessageRealtimePayload) => {
-      console.log("📨 New message received:", payload);
+      logger.info("📨 New message received:", payload);
       addNewMessage(payload);
     },
     [addNewMessage]
@@ -48,7 +49,7 @@ export const useRealtime = ({
   // 친구 요청 처리
   const handleFriendshipChange = useCallback(
     (payload: FriendshipRealtimePayload) => {
-      console.log("👥 Friendship change:", payload);
+      logger.info("👥 Friendship change:", payload);
 
       if (payload.eventType === "INSERT" && payload.new.status === "pending") {
         // 새 친구 요청
@@ -64,7 +65,7 @@ export const useRealtime = ({
   // 내가 보낸 친구 요청 상태 변경 처리
   const handleMyFriendshipUpdate = useCallback(
     (payload: FriendshipRealtimePayload) => {
-      console.log("✅ My friendship updated:", payload);
+      logger.info("✅ My friendship updated:", payload);
       updateFriendRequestStatus(payload);
     },
     [updateFriendRequestStatus]
@@ -73,7 +74,7 @@ export const useRealtime = ({
   // 친한친구 요청 처리
   const handleCloseFriendRequest = useCallback(
     (payload: CloseFriendRequestPayload) => {
-      console.log("💖 Close friend request:", payload);
+      logger.info("💖 Close friend request:", payload);
 
       if (payload.eventType === "INSERT" && payload.new.status === "pending") {
         // 새 친한친구 요청
@@ -89,7 +90,7 @@ export const useRealtime = ({
   // 내가 보낸 친한친구 요청 상태 변경 처리
   const handleMyCloseFriendRequestUpdate = useCallback(
     (payload: CloseFriendRequestPayload) => {
-      console.log("✅ My close friend request updated:", payload);
+      logger.info("✅ My close friend request updated:", payload);
       updateCloseFriendRequestStatus(payload);
     },
     [updateCloseFriendRequestStatus]
@@ -98,7 +99,7 @@ export const useRealtime = ({
   // 메시지 상태 업데이트 처리
   const handleMessageStatusUpdate = useCallback(
     (payload: MessageRealtimePayload) => {
-      console.log("📄 Message status updated:", payload);
+      logger.info("📄 Message status updated:", payload);
 
       addRealtimeEvent({
         type: "message_status_update",
@@ -115,7 +116,7 @@ export const useRealtime = ({
       return;
     }
 
-    console.log("🔌 Setting up realtime subscriptions for user:", userId);
+    logger.info("🔌 Setting up realtime subscriptions for user:", userId);
     setConnectionStatus("connecting");
 
     try {
@@ -135,9 +136,9 @@ export const useRealtime = ({
       subscriptionsRef.current = subscriptions;
       setConnectionStatus("connected");
 
-      console.log("✅ Realtime subscriptions established");
+      logger.info("✅ Realtime subscriptions established");
     } catch (error) {
-      console.error("❌ Failed to setup realtime subscriptions:", error);
+      logger.error("❌ Failed to setup realtime subscriptions:", error);
       setConnectionStatus("error");
     }
   }, [
@@ -154,13 +155,13 @@ export const useRealtime = ({
 
   // 구독 해제
   const teardownSubscriptions = useCallback(() => {
-    console.log("🔌 Tearing down realtime subscriptions");
+    logger.info("🔌 Tearing down realtime subscriptions");
 
     subscriptionsRef.current.forEach((subscription) => {
       try {
         subscription.unsubscribe();
       } catch (error) {
-        console.warn("Warning: Failed to unsubscribe from channel:", error);
+        logger.warn("Warning: Failed to unsubscribe from channel:", error);
       }
     });
 
