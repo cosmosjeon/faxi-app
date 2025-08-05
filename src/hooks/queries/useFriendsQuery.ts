@@ -5,13 +5,11 @@ import {
   addFriend,
   acceptFriendRequest,
   rejectFriendRequest,
-  updateCloseFriend,
 } from "@/features/friends/api";
 import type {
   FriendWithProfile,
   SearchResult,
   AddFriendRequest,
-  UpdateCloseFriendRequest,
 } from "@/features/friends/types";
 
 /**
@@ -98,27 +96,4 @@ export function useRejectFriendRequestMutation() {
   });
 }
 
-/**
- * 친한 친구 설정 업데이트 뮤테이션
- */
-export function useUpdateCloseFriendMutation() {
-  const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (data: UpdateCloseFriendRequest) => updateCloseFriend(data),
-    onSuccess: (_, variables) => {
-      // 낙관적 업데이트: 즉시 UI에 반영
-      queryClient.setQueriesData(
-        { queryKey: ["friends"] },
-        (oldData: FriendWithProfile[] | undefined) => {
-          if (!oldData) return oldData;
-          return oldData.map((friend) =>
-            friend.id === variables.friendship_id
-              ? { ...friend, is_close_friend: variables.is_close_friend }
-              : friend
-          );
-        }
-      );
-    },
-  });
-}
