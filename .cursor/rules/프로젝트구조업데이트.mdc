@@ -1,0 +1,18 @@
+---
+alwaysApply: false
+---
+## 📁 프로젝트 구조 변경 시 커서룰 반영 지침
+
+작업 도중 아래와 같은 프로젝트 구조에 변동이 있을 경우, 반드시 `.cursor/rules` 내부의 규칙 파일에 해당 내용을 반영할 것:
+
+- 폴더 구조 변경 (추가 / 삭제 / 이동)
+- 파일 추가 및 삭제
+- 중요 파일 경로 변경
+
+### 🗂️ 적용 경로
+- C:\Users\aaa\OneDrive\안중요\Desktop\FAXI_app\faxi-app.cursor\rules
+
+### 📝 예시
+- `components/` 폴더에 새 파일 추가 시 → 해당 경로를 규칙 파일에 명시
+- `pages/SendMessage.tsx` → `pages/message/SendMessage.tsx`로 이동 시 → 경로 수정 반영
+
