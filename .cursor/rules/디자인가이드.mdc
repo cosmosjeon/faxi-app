@@ -1,0 +1,126 @@
+---
+alwaysApply: false
+---
+# FAXI Design Guide
+
+## 1. Overall Mood (전체적인 무드)
+FAXI는 **미니멀하고 깔끔한** 디자인 철학을 바탕으로 합니다. 디지털 과잉 소통 문제를 해결하는 서비스 특성상, 앱 자체는 시각적 방해 요소를 최소화하고 사용자가 진정한 소통(메시지와 사진)에 집중할 수 있도록 돕습니다. Notion처럼 기능 중심적이면서도 따뜻한 인간미를 잃지 않는 균형잡힌 무드를 추구합니다.
+
+## 2. Reference Service (참조 서비스)
+- **Name**: Notion
+- **Description**: 올인원 워크스페이스 및 노트 앱
+- **Design Mood**: 미니멀, 깔끔, 기능 중심적이면서도 사용자 친화적
+- **Primary Color**: #2F3437 (다크 그레이)
+- **Secondary Color**: #F7F6F3 (오프 화이트)
+
+## 3. Color & Gradient (색상 & 그라데이션)
+**Mood**: 쿨톤, 낮은 채도로 눈의 피로감 최소화
+
+- **Primary Color**: #2F3437 (다크 그레이) - 텍스트, 주요 버튼
+- **Secondary Color**: #F7F6F3 (오프 화이트) - 배경, 카드
+- **Accent Color**: #6B7280 (미디움 그레이) - 보조 텍스트, 아이콘
+- **Success Color**: #10B981 (소프트 그린) - 성공 상태, 연결 완료
+- **Warning Color**: #F59E0B (소프트 오렌지) - 주의, 대기 상태
+- **Error Color**: #EF4444 (소프트 레드) - 오류, 실패 상태
+- **Background**: #FFFFFF (순백) - 메인 배경
+- **Surface**: #F9FAFB (라이트 그레이) - 카드, 섹션 배경
+
+**Color Usage**: 
+- 가장 중요한 UI 요소(CTA 버튼, 활성 상태)에 Primary Color 사용
+- 배경과 카드에는 Secondary Color로 시각적 계층 구조 형성
+- 상태 표시는 Success/Warning/Error Color로 직관적 피드백 제공
+
+## 4. Typography & Font (타이포그래피 & 폰트)
+**시스템 폰트 우선 사용으로 가독성과 성능 최적화**
+
+- **Heading 1**: SF Pro Display/Noto Sans KR, 28px, Bold (700)
+- **Heading 2**: SF Pro Display/Noto Sans KR, 24px, Semibold (600)
+- **Heading 3**: SF Pro Display/Noto Sans KR, 20px, Semibold (600)
+- **Body Large**: SF Pro Text/Noto Sans KR, 16px, Regular (400)
+- **Body**: SF Pro Text/Noto Sans KR, 14px, Regular (400)
+- **Caption**: SF Pro Text/Noto Sans KR, 12px, Regular (400)
+- **Button Text**: SF Pro Text/Noto Sans KR, 16px, Medium (500)
+
+**Letter Spacing**: -0.01em ~ 0em (자연스러운 간격)
+**Line Height**: 1.4 ~ 1.6 (가독성 최적화)
+
+## 5. Layout & Structure (레이아웃 & 구조)
+- **Grid System**: 8px 기반 그리드 시스템
+- **Container Max Width**: 375px (모바일 최적화)
+- **Margin**: 16px (좌우 여백)
+- **Section Spacing**: 24px (섹션 간 간격)
+- **Card Padding**: 16px (카드 내부 여백)
+- **Border Radius**: 12px (카드, 버튼), 8px (작은 요소)
+- **Navigation**: 하단 탭 네비게이션 (3-4개 주요 기능)
+
+## 6. Visual Style (비주얼 스타일)
+- **Icons**: Outline 스타일, 24px 기본 크기, 일관된 스트로크 두께(2px)
+- **Images**: 둥근 모서리(8px), 적절한 그림자 효과
+- **Illustrations**: 심플하고 친근한 라인 일러스트
+- **Shadows**: 
+  - Card: 0 1px 3px rgba(0, 0, 0, 0.1)
+  - Button: 0 1px 2px rgba(0, 0, 0, 0.05)
+- **Border**: 1px solid #E5E7EB (구분선)
+
+## 7. UX Guide (UX 가이드)
+**초보자 친화적 UX 전략 - "쉽고 직관적인 경험"**
+
+### 핵심 원칙:
+1. **친근한 언어 사용**: 기술 용어 대신 일상 언어로 안내
+2. **단계별 진행**: 복잡한 과정을 작은 단위로 분할
+3. **명확한 다음 액션**: 항상 "다음에 뭘 해야 하는지" 표시
+4. **안전한 실험**: 실수해도 쉽게 되돌릴 수 있는 환경
+5. **즉각적 피드백**: 모든 액션에 대한 명확한 반응 제공
+
+### 구체적 적용:
+- **온보딩**: 3-4단계 친근한 튜토리얼
+- **BLE 연결**: "프린터와 친구 맺기" 같은 친근한 표현
+- **에러 메시지**: "문제를 해결해드릴게요" 같은 도움말 톤
+- **빈 상태**: 다음 액션을 유도하는 친절한 안내
+- **로딩 상태**: 진행 과정을 재미있게 표현
+
+## 8. UI Component Guide (UI 컴포넌트 가이드)
+
+### Buttons
+- **Primary Button**: 
+  - Background: #2F3437
+  - Text: #FFFFFF
+  - Height: 48px
+  - Border Radius: 12px
+  - Font: Medium 16px
+
+- **Secondary Button**:
+  - Background: #F9FAFB
+  - Text: #2F3437
+  - Border: 1px solid #E5E7EB
+  - Height: 48px
+
+### Input Fields
+- **Default**: 
+  - Background: #FFFFFF
+  - Border: 1px solid #E5E7EB
+  - Height: 48px
+  - Padding: 12px 16px
+  - Border Radius: 8px
+
+- **Focus**: Border color #6B7280
+
+### Cards
+- **Background**: #FFFFFF
+- **Border Radius**: 12px
+- **Shadow**: 0 1px 3px rgba(0, 0, 0, 0.1)
+- **Padding**: 16px
+
+### Navigation
+- **Tab Bar**: 
+  - Background: #FFFFFF
+  - Height: 80px (Safe Area 포함)
+  - Active Color: #2F3437
+  - Inactive Color: #9CA3AF
+
+### Status Indicators
+- **Connected**: #10B981 (그린) + 체크 아이콘
+- **Connecting**: #F59E0B (오렌지) + 로딩 애니메이션  
+- **Disconnected**: #EF4444 (레드) + 경고 아이콘
+
+

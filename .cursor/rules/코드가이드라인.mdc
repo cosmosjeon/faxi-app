@@ -38,41 +38,108 @@ Studio Pensieve is an offline social media platform combining a Next.js-based Pr
 ```
 // MUST: Domain-driven organization
 src/
-├── app/
-│   ├── (main)/
-│   │   ├── messages/
+├── app/                          # Next.js App Router (라우팅 및 페이지)
+│   ├── (auth)/                  # 인증 관련 라우트 그룹
+│   │   ├── login/
+│   │   │   └── page.tsx
+│   │   └── onboarding/
+│   │       └── page.tsx
+│   ├── (main)/                  # 메인 서비스 라우트 그룹
+│   │   ├── home/
+│   │   │   └── page.tsx
+│   │   ├── friends/
 │   │   │   ├── page.tsx
-│   │   │   └── components/
-│   │   │       ├── MessageCard.tsx
-│   │   │       └── MessageComposer.tsx
-│   │   └── layout.tsx
-├── components/
-│   ├── domain/
-│   │   ├── messages/
-│   │   │   └── MessageCard.tsx
-│   │   └── printer/
-│   │       └── PrinterStatusIndicator.tsx
-│   └── ui/
+│   │   │   └── add/
+│   │   │       └── page.tsx
+│   │   ├── compose/
+│   │   │   └── page.tsx
+│   │   ├── printer/
+│   │   │   ├── page.tsx
+│   │   │   └── photo-edit/
+│   │   │       └── page.tsx
+│   │   ├── profile/
+│   │   │   ├── page.tsx
+│   │   │   ├── help/
+│   │   │   │   └── page.tsx
+│   │   │   ├── notifications/
+│   │   │   │   └── page.tsx
+│   │   │   └── privacy/
+│   │   │       └── page.tsx
+│   │   ├── layout.tsx
+│   │   └── loading.tsx
+│   ├── auth/
+│   │   └── callback/
+│   │       └── route.ts
+│   ├── layout.tsx
+│   ├── page.tsx
+│   ├── providers.tsx
+│   └── client-providers.tsx
+├── components/                   # 재사용 가능한 UI 컴포넌트
+│   ├── auth-provider.tsx        # 인증 프로바이더
+│   ├── RealtimeNotifications.tsx # 실시간 알림 컴포넌트
+│   ├── RealtimeProvider.tsx     # 실시간 프로바이더
+│   ├── domain/                  # 도메인 특화 컴포넌트
+│   │   ├── image/
+│   │   │   └── ImageEditor.tsx
+│   │   └── navigation/
+│   │       ├── BottomTabBar.tsx
+│   │       └── PrinterCheck.tsx
+│   ├── dynamic/                 # 동적 컴포넌트
+│   └── ui/                      # shadcn/ui 기반 범용 컴포넌트
+│       ├── accordion.tsx
+│       ├── alert-dialog.tsx
+│       ├── avatar.tsx
+│       ├── badge.tsx
 │       ├── button.tsx
-│       └── dialog.tsx
-├── domain/
+│       ├── card.tsx
+│       ├── checkbox.tsx
+│       ├── collapsible.tsx
+│       ├── dialog.tsx
+│       ├── dropdown-menu.tsx
+│       ├── file-upload.tsx
+│       ├── form.tsx
+│       ├── input.tsx
+│       ├── label.tsx
+│       ├── loading-button.tsx
+│       ├── optimized-image.tsx
+│       ├── page-loading.tsx
+│       ├── progress.tsx
+│       ├── select.tsx
+│       ├── separator.tsx
+│       ├── sheet.tsx
+│       ├── switch.tsx
+│       ├── textarea.tsx
+│       ├── toast.tsx
+│       └── toaster.tsx
+├── features/                    # 기능별 비즈니스 로직 및 타입
+│   ├── friends/
+│   │   ├── api.ts              # 친구 관련 API 호출 함수
+│   │   └── types.ts            # 친구 타입 정의
 │   ├── messages/
-│   │   ├── api.ts
-│   │   └── types.ts
-│   ├── users/
-│   │   ├── api.ts
-│   │   └── types.ts
-│   └── printer/
-│       ├── service.ts // BLE service logic
-│       └── types.ts
-├── hooks/
-│   ├── useBlePrinter.ts
-│   └── useAuthSession.ts
-├── lib/
-│   ├── supabase/
-│   │   ├── client.ts
-│   │   └── server.ts
-│   └── utils.ts
+│   │   ├── api.ts              # 메시지 관련 API 호출 함수
+│   │   └── types.ts            # 메시지 타입 정의
+│   └── settings/
+│       ├── api.ts              # 설정 관련 API 호출 함수
+│       └── types.ts            # 설정 타입 정의
+├── hooks/                       # 커스텀 훅
+│   ├── use-toast.ts
+│   ├── useBlePrinter.ts        # BLE 프린터 훅
+│   ├── useRealtime.ts          # 실시간 데이터 훅
+│   ├── useRealtimeDataSync.ts  # 실시간 데이터 동기화 훅
+│   └── useRealtimeNotifications.ts # 실시간 알림 훅
+├── lib/                         # 라이브러리 및 유틸리티
+│   ├── cache-config.ts
+│   ├── performance-utils.ts
+│   ├── supabase/               # Supabase 클라이언트 설정
+│   │   ├── client.ts           # 클라이언트 사이드 인스턴스
+│   │   ├── realtime.ts         # 실시간 연결
+│   │   └── server.ts           # 서버 사이드 인스턴스
+│   ├── toasts.ts
+│   └── utils.ts                # 공통 유틸리티 함수
+└── stores/                      # Zustand 상태 관리
+    ├── auth.store.ts            # 인증 상태
+    ├── printer.store.ts         # 프린터 상태
+    └── realtimeStore.ts        # 실시간 이벤트 상태
 ```
 
 **MUST NOT Do:**
