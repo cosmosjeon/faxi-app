@@ -1,11 +1,4 @@
 import { toast } from "@/hooks/use-toast";
-import {
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Info,
-  Loader2,
-} from "lucide-react";
 
 export const showSuccessToast = (message: string, description?: string) => {
   toast({

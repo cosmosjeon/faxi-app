@@ -9,6 +9,7 @@ import type {
   SendMessageRequest,
   MessagePrintStatus,
 } from "@/features/messages/types";
+import { useAuthStore } from "@/stores/auth.store";
 
 /**
  * 메시지 목록 조회 쿼리
@@ -32,9 +33,15 @@ export function useMessagesQuery(userId: string | undefined) {
  */
 export function useSendMessageMutation() {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
 
   return useMutation({
-    mutationFn: (data: SendMessageRequest) => sendMessage(data),
+    mutationFn: (data: SendMessageRequest) => {
+      if (!user?.id) {
+        throw new Error("사용자 인증이 필요합니다.");
+      }
+      return sendMessage(data, user.id);
+    },
     onSuccess: (newMessage, variables) => {
       // 낙관적 업데이트: 즉시 UI에 반영
       queryClient.setQueryData(
