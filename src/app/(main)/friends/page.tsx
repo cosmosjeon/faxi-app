@@ -45,6 +45,7 @@ import type { FriendWithProfile } from "@/features/friends/types";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase/client";
 import { useRealtimeDataSync } from "@/hooks/useRealtimeDataSync";
+import { FriendListSkeleton } from "@/components/ui/friend-skeleton";
 
 export default function FriendsPage() {
   const router = useRouter();
@@ -483,12 +484,14 @@ export default function FriendsPage() {
     setUpdatingFriendIds((prev) => new Set(prev).add(friendshipId));
 
     try {
-      await acceptFriendMutation.mutateAsync(friendshipId);
+      await acceptFriendRequest(friendshipId);
 
       toast({
         title: "친구 요청 수락",
         description: "친구 요청을 수락했습니다.",
       });
+      
+      await loadFriends(); // 목록 새로고침
     } catch (error) {
       console.error("친구 요청 수락 실패:", error);
       toast({
@@ -510,12 +513,14 @@ export default function FriendsPage() {
     setUpdatingFriendIds((prev) => new Set(prev).add(friendshipId));
 
     try {
-      await rejectFriendMutation.mutateAsync(friendshipId);
+      await rejectFriendRequest(friendshipId);
 
       toast({
         title: "친구 요청 거절",
         description: "친구 요청을 거절했습니다.",
       });
+      
+      await loadFriends(); // 목록 새로고침
     } catch (error) {
       console.error("친구 요청 거절 실패:", error);
       toast({
@@ -761,10 +766,10 @@ export default function FriendsPage() {
         )}
 
         {/* 로딩 상태 */}
-        {showLoading && <FriendListSkeleton />}
+        {isLoading && <FriendListSkeleton />}
 
         {/* 친구 목록 */}
-        {!showLoading &&
+        {!isLoading &&
           (acceptedFriends.length > 0 ||
             receivedRequests.length > 0 ||
             sentRequests.length > 0) && (
@@ -882,14 +887,57 @@ export default function FriendsPage() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {receivedRequests.map((friend) => (
-                      <FriendCard
+                      <div
                         key={friend.id}
-                        friend={friend}
-                        isUpdating={updatingFriendIds.has(friend.id)}
-                        onCloseFriendToggle={handleCloseFriendToggle}
-                        onAcceptRequest={handleAcceptRequest}
-                        onRejectRequest={handleRejectRequest}
-                      />
+                        className="flex items-center justify-between p-3 rounded-lg border border-blue-200 bg-blue-50 hover:shadow-sm transition-shadow duration-200"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-12 w-12">
+                            <AvatarImage
+                              src={friend.friend_profile?.avatar_url || ""}
+                              alt={friend.friend_profile?.display_name || ""}
+                            />
+                            <AvatarFallback>
+                              {friend.friend_profile?.display_name?.[0]?.toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+
+                          <div>
+                            <h3 className="font-medium text-gray-900">
+                              {friend.friend_profile.display_name}
+                            </h3>
+                            <p className="text-sm text-gray-600">
+                              @{friend.friend_profile.username}
+                            </p>
+                            <div className="flex items-center gap-1 mt-1">
+                              <UserPlus size={12} className="text-blue-500" />
+                              <span className="text-xs text-blue-600">
+                                친구 요청을 보냈어요
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleAcceptRequest(friend.id)}
+                            disabled={updatingFriendIds.has(friend.id)}
+                            className="bg-gray-900 text-white hover:bg-gray-800"
+                          >
+                            수락
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleRejectRequest(friend.id)}
+                            disabled={updatingFriendIds.has(friend.id)}
+                            className="text-gray-700 hover:bg-gray-100"
+                          >
+                            거절
+                          </Button>
+                        </div>
+                      </div>
                     ))}
                   </CardContent>
                 </Card>
@@ -961,7 +1009,7 @@ export default function FriendsPage() {
           )}
 
         {/* 검색 결과 없음 */}
-        {!showLoading &&
+        {!isLoading &&
           searchQuery &&
           filteredFriends.length === 0 &&
           friends.length > 0 && (
@@ -977,7 +1025,7 @@ export default function FriendsPage() {
           )}
 
         {/* 친구 없음 */}
-        {!showLoading && friends.length === 0 && (
+        {!isLoading && friends.length === 0 && (
           <Card>
             <CardHeader>
               <CardTitle>내 친구들</CardTitle>

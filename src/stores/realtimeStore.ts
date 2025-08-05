@@ -6,6 +6,20 @@ import {
   FriendshipRealtimePayload,
   CloseFriendRequestPayload,
 } from "@/lib/supabase/realtime";
+import { logger } from "@/features/utils";
+
+// 메모리 관리 상수
+const MAX_EVENTS_HISTORY = 50;
+const MAX_NEW_MESSAGES = 20;
+const MAX_FRIEND_REQUESTS = 10;
+const MAX_CLOSE_FRIEND_REQUESTS = 10;
+const EVENT_TTL_HOURS = 24;
+
+// TTL 기반 이벤트 정리 헬퍼
+const cleanupExpiredEvents = (events: RealtimeEvent[]): RealtimeEvent[] => {
+  const cutoffTime = new Date(Date.now() - EVENT_TTL_HOURS * 60 * 60 * 1000);
+  return events.filter(event => event.timestamp > cutoffTime).slice(0, MAX_EVENTS_HISTORY);
+};
 
 // 실시간 이벤트 타입
 export interface RealtimeEvent {
@@ -89,13 +103,14 @@ export const useRealtimeStore = create<RealtimeState>((set, get) => ({
 
   // 연결 상태 관리
   setConnectionStatus: (status) => {
+    logger.info("🔗 실시간 연결 상태 변경:", status);
     set({
       connectionStatus: status,
       isConnected: status === "connected",
     });
   },
 
-  // 새 메시지 추가
+  // 새 메시지 추가 (메모리 누수 방지)
   addNewMessage: (message) => {
     const currentMessages = get().newMessages;
 
@@ -104,8 +119,10 @@ export const useRealtimeStore = create<RealtimeState>((set, get) => ({
       return;
     }
 
+    logger.info("📨 새 실시간 메시지:", message.new.id);
+
     set((state) => ({
-      newMessages: [...state.newMessages, message],
+      newMessages: [...state.newMessages, message].slice(-MAX_NEW_MESSAGES),
       unreadMessagesCount: state.unreadMessagesCount + 1,
     }));
 
@@ -130,7 +147,7 @@ export const useRealtimeStore = create<RealtimeState>((set, get) => ({
     }));
   },
 
-  // 새 친구 요청 추가
+  // 새 친구 요청 추가 (메모리 누수 방지)
   addNewFriendRequest: (request) => {
     const currentRequests = get().newFriendRequests;
 
@@ -140,8 +157,10 @@ export const useRealtimeStore = create<RealtimeState>((set, get) => ({
     }
 
     if (request.eventType === "INSERT" && request.new.status === "pending") {
+      logger.info("👫 새 친구 요청:", request.new.id);
+      
       set((state) => ({
-        newFriendRequests: [...state.newFriendRequests, request],
+        newFriendRequests: [...state.newFriendRequests, request].slice(-MAX_FRIEND_REQUESTS),
         pendingFriendRequestsCount: state.pendingFriendRequestsCount + 1,
       }));
 
@@ -156,11 +175,21 @@ export const useRealtimeStore = create<RealtimeState>((set, get) => ({
   // 친구 요청 상태 업데이트
   updateFriendRequestStatus: (request) => {
     if (request.eventType === "UPDATE" && request.new.status === "accepted") {
-      get().addRealtimeEvent({
-        type: "friend_accepted",
-        data: request,
-        read: false,
-      });
+      // 실제 친구 요청 수락인지 확인 (최근 생성된 관계만)
+      const createdAt = new Date(request.new.created_at).getTime();
+      const updatedAt = new Date(request.new.updated_at).getTime();
+      const isRecentlyAccepted = Math.abs(updatedAt - createdAt) < 30000; // 30초 이내
+      
+      if (isRecentlyAccepted) {
+        logger.info("✅ 친구 요청 수락:", request.new.id);
+        get().addRealtimeEvent({
+          type: "friend_accepted",
+          data: request,
+          read: false,
+        });
+      } else {
+        logger.info("⚠️ 기존 친구 관계 업데이트 (친구 요청 수락 아님):", request.new.id);
+      }
     }
   },
 
@@ -169,7 +198,7 @@ export const useRealtimeStore = create<RealtimeState>((set, get) => ({
     set({ newFriendRequests: [], pendingFriendRequestsCount: 0 });
   },
 
-  // 새 친한친구 요청 추가
+  // 새 친한친구 요청 추가 (메모리 누수 방지)
   addNewCloseFriendRequest: (request) => {
     const currentRequests = get().newCloseFriendRequests;
 
@@ -179,8 +208,10 @@ export const useRealtimeStore = create<RealtimeState>((set, get) => ({
     }
 
     if (request.eventType === "INSERT" && request.new.status === "pending") {
+      logger.info("💝 새 친한친구 요청:", request.new.id);
+      
       set((state) => ({
-        newCloseFriendRequests: [...state.newCloseFriendRequests, request],
+        newCloseFriendRequests: [...state.newCloseFriendRequests, request].slice(-MAX_CLOSE_FRIEND_REQUESTS),
         pendingCloseFriendRequestsCount:
           state.pendingCloseFriendRequestsCount + 1,
       }));
@@ -196,6 +227,7 @@ export const useRealtimeStore = create<RealtimeState>((set, get) => ({
   // 친한친구 요청 상태 업데이트
   updateCloseFriendRequestStatus: (request) => {
     if (request.eventType === "UPDATE" && request.new.status === "accepted") {
+      logger.info("💝 친한친구 요청 수락:", request.new.id);
       get().addRealtimeEvent({
         type: "close_friend_accepted",
         data: request,
@@ -209,7 +241,7 @@ export const useRealtimeStore = create<RealtimeState>((set, get) => ({
     set({ newCloseFriendRequests: [], pendingCloseFriendRequestsCount: 0 });
   },
 
-  // 실시간 이벤트 추가
+  // 실시간 이벤트 추가 (TTL 기반 메모리 관리)
   addRealtimeEvent: (event) => {
     const newEvent: RealtimeEvent = {
       id: `${Date.now()}-${Math.random()}`,
@@ -218,7 +250,7 @@ export const useRealtimeStore = create<RealtimeState>((set, get) => ({
     };
 
     set((state) => ({
-      realtimeEvents: [newEvent, ...state.realtimeEvents].slice(0, 100), // 최대 100개만 유지
+      realtimeEvents: cleanupExpiredEvents([newEvent, ...state.realtimeEvents]),
     }));
   },
 

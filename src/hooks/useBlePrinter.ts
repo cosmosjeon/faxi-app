@@ -7,20 +7,28 @@ import {
 } from "@/stores/printer.store";
 import { toast } from "@/hooks/use-toast";
 import { printerToasts } from "@/lib/toasts";
+import { logger } from "@/features/utils";
+
+// 프린터 설정
+const PRINTER_MAX_WIDTH = 384;
+const GRAYSCALE_WEIGHTS = {
+  R: 0.299,
+  G: 0.587,
+  B: 0.114,
+} as const;
 
 /**
- * BLE 프린터 연동을 위한 커스텀 훅
- * 프린터 연결, 상태 관리, 프린트 작업 등을 쉽게 사용할 수 있습니다.
+ * BLE 프린터 연동 훅
  */
 export function useBlePrinter() {
   const store = usePrinterStore();
 
-  // 컴포넌트 마운트 시 BLE 지원 여부 확인
+  // BLE 지원 여부 확인
   useEffect(() => {
     store.checkBleSupport();
   }, [store.checkBleSupport]);
 
-  // 연결 상태 변화 감지 및 토스트 알림
+  // 연결 상태 알림
   useEffect(() => {
     if (store.status === "connected" && store.connectedPrinter) {
       toast({
@@ -37,7 +45,7 @@ export function useBlePrinter() {
   }, [store.status, store.connectedPrinter, store.error]);
 
   /**
-   * 메시지 프린트 (텍스트 + 이미지)
+   * 메시지 프린트
    */
   const printMessage = async (messageData: {
     text?: string;
@@ -111,7 +119,7 @@ export function useBlePrinter() {
       await store.connectPrinter();
     } catch (error) {
       // 에러는 스토어에서 처리되므로 여기서는 다시 throw하지 않음
-      console.error("프린터 연결 실패:", error);
+      logger.error("프린터 연결 실패:", error);
     }
   };
 
@@ -123,7 +131,7 @@ export function useBlePrinter() {
       await store.disconnectPrinter();
       printerToasts.disconnectSuccess();
     } catch (error) {
-      console.error("프린터 연결 해제 실패:", error);
+      logger.error("프린터 연결 해제 실패:", error);
     }
   };
 
@@ -257,9 +265,8 @@ async function convertImageForPrint(imageUrl: string): Promise<ArrayBuffer> {
           throw new Error("Canvas context를 생성할 수 없습니다.");
         }
 
-        // 프린터 너비에 맞춰 리사이즈 (예: 384px)
-        const maxWidth = 384;
-        const ratio = Math.min(maxWidth / img.width, maxWidth / img.height);
+        // 프린터 너비에 맞춰 리사이즈
+        const ratio = Math.min(PRINTER_MAX_WIDTH / img.width, PRINTER_MAX_WIDTH / img.height);
 
         canvas.width = img.width * ratio;
         canvas.height = img.height * ratio;
@@ -273,7 +280,7 @@ async function convertImageForPrint(imageUrl: string): Promise<ArrayBuffer> {
 
         for (let i = 0; i < data.length; i += 4) {
           const gray =
-            data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+            data[i] * GRAYSCALE_WEIGHTS.R + data[i + 1] * GRAYSCALE_WEIGHTS.G + data[i + 2] * GRAYSCALE_WEIGHTS.B;
           data[i] = gray; // R
           data[i + 1] = gray; // G
           data[i + 2] = gray; // B

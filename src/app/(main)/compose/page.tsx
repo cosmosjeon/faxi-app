@@ -24,14 +24,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuthStore } from "@/stores/auth.store";
-import { validateMessageForm } from "@/features/messages/api";
+import { validateMessageForm, sendMessage } from "@/features/messages/api";
+import { getFriendsList } from "@/features/friends/api";
 import type { FriendWithProfile } from "@/features/friends/types";
 import type {
   MessageFormData,
   MessageFormErrors,
 } from "@/features/messages/types";
 import { toast } from "@/hooks/use-toast";
-import { messageToasts, imageToasts } from "@/lib/toasts";
 import { ImageEditor } from "@/components/domain/image/ImageEditor";
 
 export default function ComposePage() {
@@ -62,7 +62,47 @@ export default function ComposePage() {
   // 이미지 미리보기
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
-  // React Query가 자동으로 친구 목록을 로드하므로 useEffect 제거
+  // 이미지 파일 유효성 검사
+  const validateImageFile = (file: File) => {
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    
+    if (!allowedTypes.includes(file.type)) {
+      return { isValid: false, error: 'JPG, PNG 형식의 이미지만 업로드 가능합니다.' };
+    }
+    
+    if (file.size > maxSize) {
+      return { isValid: false, error: '이미지 파일은 최대 5MB까지 업로드 가능합니다.' };
+    }
+    
+    return { isValid: true };
+  };
+
+  // 친구 목록 로딩
+  useEffect(() => {
+    const loadFriends = async () => {
+      if (!profile) return;
+      
+      setIsLoadingFriends(true);
+      try {
+        const friendsList = await getFriendsList(profile.id);
+        // 수락된 친구만 필터링
+        const acceptedFriends = friendsList.filter(f => f.status === 'accepted');
+        setFriends(acceptedFriends);
+      } catch (error) {
+        console.error('친구 목록 로딩 실패:', error);
+        toast({
+          title: "친구 목록 로딩 실패",
+          description: "친구 목록을 불러오는데 실패했습니다.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingFriends(false);
+      }
+    };
+
+    loadFriends();
+  }, [profile]);
 
   // 텍스트 입력 핸들러
   const handleContentChange = (value: string) => {
@@ -100,7 +140,6 @@ export default function ComposePage() {
     // 파일 유효성 검사
     const validation = validateImageFile(file);
     if (!validation.isValid) {
-      imageToasts.uploadError();
       toast({
         title: "이미지 업로드 실패",
         description: validation.error,
@@ -110,21 +149,20 @@ export default function ComposePage() {
     }
 
     try {
-      // 이미지 압축
-      const compressedFile = await compressImage(file, {
-        maxWidth: 800,
-        maxHeight: 600,
-        quality: 0.8,
-        format: "jpeg",
+      // 원본 파일 저장하고 편집 모드로 전환
+      setOriginalImageFile(file);
+      setEditMode("imageEdit");
+
+      if (errors.image_file) {
+        setErrors((prev) => ({ ...prev, image_file: undefined }));
+      }
+    } catch (error) {
+      console.error("이미지 처리 실패:", error);
+      toast({
+        title: "이미지 처리 실패",
+        description: "이미지를 처리하는 중 오류가 발생했습니다.",
+        variant: "destructive",
       });
-
-
-    // 원본 파일 저장하고 편집 모드로 전환
-    setOriginalImageFile(file);
-    setEditMode("imageEdit");
-
-    if (errors.image_file) {
-      setErrors((prev) => ({ ...prev, image_file: undefined }));
     }
   };
 
@@ -188,16 +226,19 @@ export default function ComposePage() {
       return;
     }
 
+    setIsSending(true);
     try {
-      await sendMessageMutation.mutateAsync({
+      await sendMessage({
         receiver_id: formData.receiver_id,
         content: formData.content || undefined,
         image_file: formData.image_file || undefined,
         lcd_teaser: formData.lcd_teaser || undefined,
-        sender_id: profile.id,
-      });
+      }, profile.id);
 
-      messageToasts.sendSuccess();
+      toast({
+        title: "메시지 전송 완료",
+        description: "메시지가 성공적으로 전송되었습니다.",
+      });
 
       // 폼 초기화
       setFormData({
@@ -215,7 +256,13 @@ export default function ComposePage() {
       router.push("/home");
     } catch (error) {
       console.error("메시지 전송 실패:", error);
-      messageToasts.sendError();
+      toast({
+        title: "메시지 전송 실패",
+        description: "메시지 전송 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -228,7 +275,7 @@ export default function ComposePage() {
   const canSend =
     formData.receiver_id &&
     (formData.content.trim() || formData.image_file) &&
-    !sendMessageMutation.isPending &&
+    !isSending &&
     Object.keys(errors).length === 0;
 
   return (
@@ -447,7 +494,7 @@ export default function ComposePage() {
                     </Button>
                     <div className="mt-2 text-sm text-gray-600">
                       {formData.image_file?.name} (
-                      {(formData.image_file?.size || 0 / 1024 / 1024).toFixed(
+                      {((formData.image_file?.size || 0) / 1024 / 1024).toFixed(
                         1
                       )}
                       MB)

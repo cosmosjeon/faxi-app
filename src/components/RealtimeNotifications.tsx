@@ -102,11 +102,9 @@ export const RealtimeNotifications = () => {
           }
 
           case "friend_accepted": {
-            const accepterName = await getUserName(event.data.new.friend_id);
-            showNotification(
-              `✅ 친구 요청 수락`,
-              `${accepterName}님이 친구 요청을 수락했습니다`
-            );
+            // 현재 MVP에서는 친구 요청 수락 알림을 비활성화
+            // (친한친구 해제 등으로 인한 잘못된 이벤트와 구분이 어려움)
+            console.log("친구 요청 수락 이벤트 감지 (알림 생략):", event);
             break;
           }
 

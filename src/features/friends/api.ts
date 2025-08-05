@@ -1,5 +1,7 @@
 import { supabase } from "@/lib/supabase/client";
 import { friendToasts } from "@/lib/toasts";
+import { SEARCH_RESULT_LIMIT, MIN_BATCH_FRIENDS_COUNT } from "../constants";
+import { handleApiError, logger } from "../utils";
 import type {
   UserProfile,
   Friendship,
@@ -24,7 +26,7 @@ export async function searchUserByUsername(
       .select("*")
       .ilike("username", `%${username}%`)
       .eq("is_active", true)
-      .limit(10);
+      .limit(SEARCH_RESULT_LIMIT);
 
     if (error) throw error;
 
@@ -36,48 +38,37 @@ export async function searchUserByUsername(
       })) || []
     );
   } catch (error) {
-    console.error("사용자 검색 실패:", error);
-    throw new Error("사용자 검색에 실패했습니다.");
+    handleApiError("FRIEND_SEARCH_FAILED", error);
   }
 }
 
 /**
- * 현재 사용자의 친구 목록 조회 (기존 로직 + 일부 최적화)
+ * 현재 사용자의 친구 목록 조회
  */
 export async function getFriendsList(
   userId: string
 ): Promise<FriendWithProfile[]> {
   try {
-    // 1. 내가 보낸 친구 요청들 조회
+    // 내가 보낸 친구 요청들
     const { data: sentRequests, error: sentError } = await supabase
       .from("friendships")
-      .select(
-        `
-                *,
-                friend_profile:friend_id(*)
-            `
-      )
+      .select(`*, friend_profile:friend_id(*)`)
       .eq("user_id", userId)
       .in("status", ["accepted", "pending"]);
 
     if (sentError) throw sentError;
 
-    // 2. 내가 받은 친구 요청들 조회
+    // 내가 받은 친구 요청들
     const { data: receivedRequests, error: receivedError } = await supabase
       .from("friendships")
-      .select(
-        `
-                *,
-                friend_profile:user_id(*)
-            `
-      )
+      .select(`*, friend_profile:user_id(*)`)
       .eq("friend_id", userId)
       .in("status", ["accepted", "pending"]);
 
     if (receivedError) throw receivedError;
 
-    // 3. 받은 요청의 데이터 구조를 보낸 요청과 맞추기
-    const normalizedReceivedRequests = (receivedRequests || []).map((req) => ({
+    // 받은 요청 데이터 정규화
+    const normalizedReceived = (receivedRequests || []).map((req) => ({
       ...req,
       friend_profile: req.friend_profile,
       friend_id: req.user_id,
@@ -85,49 +76,40 @@ export async function getFriendsList(
       is_received_request: true,
     }));
 
-    // 4. 보낸 요청에 플래그 추가
-    const normalizedSentRequests = (sentRequests || []).map((req) => ({
+    const normalizedSent = (sentRequests || []).map((req) => ({
       ...req,
       is_received_request: false,
     }));
 
-    // 5. 두 배열 합치기
-    const allFriendships = [
-      ...normalizedSentRequests,
-      ...normalizedReceivedRequests,
-    ];
+    const allFriendships = [...normalizedSent, ...normalizedReceived];
 
-    // 6. 맞팔 여부 확인을 배치로 처리 (최적화)
-    const acceptedFriendships = allFriendships.filter(
-      (f) => f.status === "accepted"
-    );
-    const friendIds = acceptedFriendships.map((f) => f.friend_id);
+    // 맞팔 여부 확인 (수락된 친구만)
+    const acceptedFriendIds = allFriendships
+      .filter((f) => f.status === "accepted")
+      .map((f) => f.friend_id);
 
-    let mutualFriends: Set<string> = new Set();
-
-    if (friendIds.length > 0) {
+    let mutualFriends = new Set<string>();
+    
+    if (acceptedFriendIds.length > 0) {
       const { data: mutualData } = await supabase
         .from("friendships")
         .select("user_id")
         .eq("friend_id", userId)
-        .in("user_id", friendIds)
+        .in("user_id", acceptedFriendIds)
         .eq("status", "accepted");
 
       mutualFriends = new Set((mutualData || []).map((f) => f.user_id));
     }
 
-    // 7. 최종 데이터 구성
-    const friendsWithMutual = allFriendships.map((friendship) => ({
+    // 최종 데이터 구성
+    return allFriendships.map((friendship) => ({
       ...friendship,
       is_mutual:
         friendship.status === "accepted" &&
         mutualFriends.has(friendship.friend_id),
     }));
-
-    return friendsWithMutual;
   } catch (error) {
-    console.error("친구 목록 조회 실패:", error);
-    throw new Error("친구 목록을 불러오는데 실패했습니다.");
+    handleApiError("FRIEND_LIST_FAILED", error);
   }
 }
 
@@ -153,8 +135,7 @@ export async function addFriend(
     if (error) throw error;
     return data;
   } catch (error) {
-    console.error("친구 추가 실패:", error);
-    throw new Error("친구 추가에 실패했습니다.");
+    handleApiError("FRIEND_ADD_FAILED", error);
   }
 }
 
@@ -173,8 +154,7 @@ export async function removeFriend(friendshipId: string): Promise<void> {
 
     if (error) throw error;
   } catch (error) {
-    console.error("친구 삭제 실패:", error);
-    throw new Error("친구 삭제에 실패했습니다.");
+    handleApiError("FRIEND_REMOVE_FAILED", error);
   }
 }
 

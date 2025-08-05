@@ -49,6 +49,7 @@ import { toast } from "@/hooks/use-toast";
 import { CardLoading } from "@/components/ui/page-loading";
 import { messageToasts } from "@/lib/toasts";
 import { useRealtimeDataSync } from "@/hooks/useRealtimeDataSync";
+import { MessageCard } from "@/components/domain/messages/MessageCard";
 export default function HomePage() {
   const router = useRouter();
   const { profile, signOut } = useAuthStore();
@@ -373,9 +374,6 @@ export default function HomePage() {
       full_message: newMessage,
     });
 
-    // React Query로 메시지 목록 갱신
-    refetchMessages();
-
     // 친한친구 관계 직접 확인 (DB 트리거 디버깅용)
     try {
       const isCloseFriend = await areCloseFriends(
@@ -464,19 +462,13 @@ export default function HomePage() {
         async (payload) => {
           console.log("📨 Realtime 새 메시지:", payload);
 
-          // React Query 캐시 갱신으로 새 메시지 처리
+          // 새 메시지 처리
           try {
-            // 메시지 목록 즉시 갱신
-            await refetchMessages();
+            // 메시지 목록 다시 로드
+            await loadMessages();
 
-            // 새 메시지 처리 로직 실행
-            const newMessage = allMessages.find(
-              (msg) => msg.id === payload.new.id
-            );
-
-            if (newMessage) {
-              await handleNewMessage(newMessage);
-            }
+            // payload에서 새 메시지 정보 추출하여 처리
+            console.log("새 메시지 처리:", payload.new);
           } catch (error) {
             console.error("Realtime 메시지 처리 실패:", error);
           }
@@ -977,8 +969,8 @@ export default function HomePage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {showLoading ? (
-              <MessageListSkeleton />
+            {isLoading ? (
+              <CardLoading message="메시지를 불러오는 중..." />
             ) : messages.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <div className="text-4xl mb-4">📨</div>
@@ -995,7 +987,7 @@ export default function HomePage() {
                     message={message}
                     isProcessing={processingMessages.has(message.id)}
                     onAccept={(messageId) =>
-                      handleMessageAction(messageId, "accept")
+                      handleMessageAction(messageId, "approve")
                     }
                     onReject={(messageId) =>
                       handleMessageAction(messageId, "reject")

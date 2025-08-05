@@ -1,5 +1,7 @@
 import { supabase } from "@/lib/supabase/client";
 import { messageToasts, imageToasts } from "@/lib/toasts";
+import { MAX_MESSAGE_LENGTH, MAX_TEASER_LENGTH, MAX_IMAGE_SIZE } from "../constants";
+import { handleApiError, logger } from "../utils";
 import type {
   Message,
   SendMessageRequest,
@@ -10,36 +12,8 @@ import type {
 
 const isDevelopmentMode = process.env.NODE_ENV === "development";
 
-// 개발용 mock 메시지 데이터
-const DEV_MESSAGES: Message[] = [
-  {
-    id: "msg-1",
-    sender_id: "dev-user-1", // alice
-    receiver_id: "dev-user-2", // bob
-    content: "안녕! 오늘 날씨가 정말 좋네요 ☀️",
-    image_url: "https://picsum.photos/400/300?random=1",
-    lcd_teaser: "앨리스가",
-    print_status: "completed",
-    printed_at: new Date(Date.now() - 3600000).toISOString(),
-    created_at: new Date(Date.now() - 3600000).toISOString(),
-    updated_at: new Date(Date.now() - 3600000).toISOString(),
-  },
-  {
-    id: "msg-2",
-    sender_id: "dev-user-2", // bob
-    receiver_id: "dev-user-1", // alice
-    content: "맞아요! 산책하기 딱 좋은 날씨 🌸",
-    image_url: null,
-    lcd_teaser: "밥이",
-    print_status: "pending",
-    printed_at: null,
-    created_at: new Date(Date.now() - 1800000).toISOString(),
-    updated_at: new Date(Date.now() - 1800000).toISOString(),
-  },
-];
-
 /**
- * 폼 데이터 유효성 검사
+ * 메시지 폼 유효성 검사
  */
 export function validateMessageForm(data: {
   receiver_id: string;
@@ -49,35 +23,27 @@ export function validateMessageForm(data: {
 }): MessageFormErrors {
   const errors: MessageFormErrors = {};
 
-  // 수신자 검사
   if (!data.receiver_id.trim()) {
     errors.receiver_id = "메시지를 받을 친구를 선택해주세요.";
   }
 
-  // 텍스트 또는 이미지 중 하나는 필수
   if (!data.content.trim() && !data.image_file) {
     errors.general = "메시지 내용 또는 이미지 중 하나는 필수입니다.";
   }
 
-  // 텍스트 길이 검사 (200자 제한)
-  if (data.content && data.content.length > 200) {
-    errors.content = "메시지는 최대 200자까지 입력할 수 있습니다.";
+  if (data.content && data.content.length > MAX_MESSAGE_LENGTH) {
+    errors.content = `메시지는 최대 ${MAX_MESSAGE_LENGTH}자까지 입력할 수 있습니다.`;
   }
 
-  // 티저 길이 검사 (10자 제한)
-  if (data.lcd_teaser && data.lcd_teaser.length > 10) {
-    errors.lcd_teaser = "LCD 메시지는 최대 10자까지 입력할 수 있습니다.";
+  if (data.lcd_teaser && data.lcd_teaser.length > MAX_TEASER_LENGTH) {
+    errors.lcd_teaser = `LCD 메시지는 최대 ${MAX_TEASER_LENGTH}자까지 입력할 수 있습니다.`;
   }
 
-  // 이미지 파일 검사
   if (data.image_file) {
-    // 파일 크기 검사 (5MB 제한)
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (data.image_file.size > maxSize) {
-      errors.image_file = "이미지 파일은 최대 5MB까지 업로드 가능합니다.";
+    if (data.image_file.size > MAX_IMAGE_SIZE) {
+      errors.image_file = `이미지 파일은 최대 ${Math.round(MAX_IMAGE_SIZE / 1024 / 1024)}MB까지 업로드 가능합니다.`;
     }
 
-    // 파일 타입 검사
     const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
     if (!allowedTypes.includes(data.image_file.type)) {
       errors.image_file = "JPG, PNG 형식의 이미지만 업로드 가능합니다.";
@@ -176,8 +142,7 @@ export async function sendMessage(
     if (error) throw error;
     return data;
   } catch (error) {
-    console.error("메시지 전송 실패:", error);
-    throw new Error("메시지 전송에 실패했습니다.");
+    handleApiError("MESSAGE_SEND_FAILED", error);
   }
 }
 
@@ -204,8 +169,7 @@ export async function getMessagesList(
     if (error) throw error;
     return messages || [];
   } catch (error) {
-    console.error("메시지 목록 조회 실패:", error);
-    throw new Error("메시지 목록을 불러오는데 실패했습니다.");
+    handleApiError("MESSAGE_LIST_FAILED", error);
   }
 }
 
@@ -234,8 +198,7 @@ export async function updateMessagePrintStatus(
 
     if (error) throw error;
   } catch (error) {
-    console.error("메시지 상태 업데이트 실패:", error);
-    throw new Error("메시지 상태 업데이트에 실패했습니다.");
+    handleApiError("MESSAGE_STATUS_UPDATE_FAILED", error);
   }
 }
 
