@@ -17,7 +17,6 @@ import {
   XCircle,
   AlertTriangle,
   Camera,
-  Upload,
 } from "lucide-react";
 import {
   Card,
@@ -27,7 +26,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";

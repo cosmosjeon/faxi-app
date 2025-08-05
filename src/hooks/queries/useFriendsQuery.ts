@@ -11,6 +11,7 @@ import type {
   SearchResult,
   AddFriendRequest,
 } from "@/features/friends/types";
+import { useAuthStore } from "@/stores/auth.store";
 
 /**
  * 친구 목록 조회 쿼리
@@ -46,9 +47,15 @@ export function useSearchUsersQuery(username: string, enabled: boolean = true) {
  */
 export function useAddFriendMutation() {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
 
   return useMutation({
-    mutationFn: (data: AddFriendRequest) => addFriend(data),
+    mutationFn: (data: AddFriendRequest) => {
+      if (!user?.id) {
+        throw new Error("사용자 인증이 필요합니다.");
+      }
+      return addFriend(data, user.id);
+    },
     onSuccess: () => {
       // 친구 목록 갱신
       queryClient.invalidateQueries({

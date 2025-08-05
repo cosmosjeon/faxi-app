@@ -10,10 +10,10 @@ import {
 } from "@/components/ui/card";
 import { useAuthStore } from "@/stores/auth.store";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { toast } from "@/hooks/use-toast";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { signInWithOAuth, isLoading, user } = useAuthStore();
@@ -181,5 +181,15 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+    </div>}>
+      <LoginContent />
+    </Suspense>
   );
 }

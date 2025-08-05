@@ -175,21 +175,12 @@ export const useRealtimeStore = create<RealtimeState>((set, get) => ({
   // 친구 요청 상태 업데이트
   updateFriendRequestStatus: (request) => {
     if (request.eventType === "UPDATE" && request.new.status === "accepted") {
-      // 실제 친구 요청 수락인지 확인 (최근 생성된 관계만)
-      const createdAt = new Date(request.new.created_at).getTime();
-      const updatedAt = new Date(request.new.updated_at).getTime();
-      const isRecentlyAccepted = Math.abs(updatedAt - createdAt) < 30000; // 30초 이내
-      
-      if (isRecentlyAccepted) {
-        logger.info("✅ 친구 요청 수락:", request.new.id);
-        get().addRealtimeEvent({
-          type: "friend_accepted",
-          data: request,
-          read: false,
-        });
-      } else {
-        logger.info("⚠️ 기존 친구 관계 업데이트 (친구 요청 수락 아님):", request.new.id);
-      }
+      logger.info("✅ 친구 요청 수락:", request.new.id);
+      get().addRealtimeEvent({
+        type: "friend_accepted",
+        data: request,
+        read: false,
+      });
     }
   },
 

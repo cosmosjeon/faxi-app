@@ -4,13 +4,11 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  User,
   UserPlus,
   Send,
   Clock,
   Check,
   X,
-  Image as ImageIcon,
   Printer,
   Bell,
   LogOut,
@@ -30,7 +28,6 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -47,7 +44,6 @@ import { supabase } from "@/lib/supabase/client";
 import { useBlePrinter } from "@/hooks/useBlePrinter";
 import { toast } from "@/hooks/use-toast";
 import { CardLoading } from "@/components/ui/page-loading";
-import { messageToasts } from "@/lib/toasts";
 import { useRealtimeDataSync } from "@/hooks/useRealtimeDataSync";
 import { MessageCard } from "@/components/domain/messages/MessageCard";
 export default function HomePage() {
@@ -362,86 +358,7 @@ export default function HomePage() {
     }
   };
 
-  // 새 메시지 처리 (자동 프린트 vs 확인 팝업)
-  const handleNewMessage = async (newMessage: MessageWithProfiles) => {
-    console.log("🔔 새 메시지 수신 - 상세 정보:", {
-      id: newMessage.id,
-      sender: newMessage.sender_profile.display_name,
-      sender_id: newMessage.sender_id,
-      receiver_id: newMessage.receiver_id,
-      print_status: newMessage.print_status,
-      printer_connected: printer.status === "connected",
-      full_message: newMessage,
-    });
 
-    // 친한친구 관계 직접 확인 (DB 트리거 디버깅용)
-    try {
-      const isCloseFriend = await areCloseFriends(
-        profile!.id,
-        newMessage.sender_id
-      );
-      console.log("🔍 친한친구 관계 확인:", {
-        receiver_id: profile!.id,
-        sender_id: newMessage.sender_id,
-        is_close_friend: isCloseFriend,
-        message_print_status: newMessage.print_status,
-      });
-    } catch (error) {
-      console.error("❌ 친한친구 관계 확인 실패:", error);
-    }
-
-    try {
-      // 1차: DB 트리거에서 이미 친한친구 확인을 완료함
-      // print_status가 'approved'면 친한친구 메시지임
-      if (newMessage.print_status === "approved") {
-        console.log("💖 친한 친구의 메시지 (DB 트리거에서 자동 승인됨)");
-        await handleCloseFriendMessage(newMessage);
-      } else {
-        // 2차: DB 트리거가 작동하지 않은 경우 클라이언트에서 확인
-        console.log("🔄 DB 트리거 미작동 - 클라이언트에서 친한친구 확인");
-        const isCloseFriend = await areCloseFriends(
-          profile!.id,
-          newMessage.sender_id
-        );
-
-        if (isCloseFriend) {
-          console.log("💖 친한 친구 확인됨 - 클라이언트에서 처리");
-          // 메시지 상태를 approved로 업데이트
-          await updateMessagePrintStatus(newMessage.id, "approved");
-
-          // UI에서도 상태 업데이트
-          const updatedMessage = {
-            ...newMessage,
-            print_status: "approved" as const,
-          };
-          setMessages((prev) =>
-            prev.map((msg) => (msg.id === newMessage.id ? updatedMessage : msg))
-          );
-
-          await handleCloseFriendMessage(updatedMessage);
-        } else {
-          // 일반 친구: 확인 팝업 (print_status = 'pending')
-          console.log("👥 일반 친구의 메시지 - 확인 팝업 표시");
-          setConfirmDialog({
-            isOpen: true,
-            message: newMessage,
-          });
-
-          toast({
-            title: "새 메시지 도착",
-            description: `${newMessage.sender_profile.display_name}님이 메시지를 보냈습니다.`,
-          });
-        }
-      }
-    } catch (error) {
-      console.error("❌ 새 메시지 처리 실패:", error);
-      // 오류 발생 시 일반 친구로 처리
-      setConfirmDialog({
-        isOpen: true,
-        message: newMessage,
-      });
-    }
-  };
 
   // Supabase Realtime 구독
   useEffect(() => {
@@ -823,71 +740,7 @@ export default function HomePage() {
     }
   }, [printer.status, handlePrinterConnection, hasHandledQueuedMessages]);
 
-  // 메시지 시간 포맷
-  const formatMessageTime = (createdAt: string) => {
-    const now = new Date();
-    const messageTime = new Date(createdAt);
-    const diffInMinutes = Math.floor(
-      (now.getTime() - messageTime.getTime()) / (1000 * 60)
-    );
 
-    if (diffInMinutes < 1) return "방금 전";
-    if (diffInMinutes < 60) return `${diffInMinutes}분 전`;
-
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) return `${diffInHours}시간 전`;
-
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 7) return `${diffInDays}일 전`;
-
-    return messageTime.toLocaleDateString();
-  };
-
-  // 상태별 뱃지
-  const getStatusBadge = (status: MessageWithProfiles["print_status"]) => {
-    switch (status) {
-      case "pending":
-        return (
-          <Badge variant="secondary" className="gap-1">
-            <Clock size={12} />
-            대기중
-          </Badge>
-        );
-      case "approved":
-        return (
-          <Badge variant="default" className="gap-1">
-            <Printer size={12} />
-            프린트 준비
-          </Badge>
-        );
-      case "queued":
-        return (
-          <Badge
-            variant="outline"
-            className="gap-1 border-blue-200 text-blue-700 bg-blue-50"
-          >
-            <Clock size={12} />
-            프린터 대기
-          </Badge>
-        );
-      case "completed":
-        return (
-          <Badge variant="outline" className="gap-1">
-            <Check size={12} />
-            완료
-          </Badge>
-        );
-      case "failed":
-        return (
-          <Badge variant="destructive" className="gap-1">
-            <X size={12} />
-            거절됨
-          </Badge>
-        );
-      default:
-        return null;
-    }
-  };
 
   // 대기중인 메시지 개수 (pending + queued)
   const pendingCount = messages.filter(

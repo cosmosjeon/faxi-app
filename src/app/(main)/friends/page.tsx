@@ -1,13 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import {
   UserPlus,
   Search,
-  Users,
   Heart,
-  Settings,
   Clock,
   Mail,
   X,
@@ -34,7 +31,6 @@ import {
   removeCloseFriend,
   deleteFriend,
   areCloseFriends,
-  getCloseFriendRequestStatus,
   getReceivedCloseFriendRequests,
   getSentCloseFriendRequests,
   cancelCloseFriendRequest,
@@ -48,7 +44,6 @@ import { useRealtimeDataSync } from "@/hooks/useRealtimeDataSync";
 import { FriendListSkeleton } from "@/components/ui/friend-skeleton";
 
 export default function FriendsPage() {
-  const router = useRouter();
   const { profile } = useAuthStore();
   const [friends, setFriends] = useState<FriendWithProfile[]>([]);
   const [closeFriendRequests, setCloseFriendRequests] = useState<any[]>([]);

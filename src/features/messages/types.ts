@@ -1,3 +1,6 @@
+// 메시지 프린트 상태 타입
+export type MessagePrintStatus = "pending" | "approved" | "completed" | "failed" | "queued";
+
 // Message 테이블 타입 (database.mdc 기준)
 export interface Message {
   id: string;
@@ -6,7 +9,7 @@ export interface Message {
   content: string | null;
   image_url: string | null;
   lcd_teaser: string | null;
-  print_status: "pending" | "approved" | "completed" | "failed" | "queued";
+  print_status: MessagePrintStatus;
   printed_at: string | null;
   created_at: string;
   updated_at: string;
@@ -36,7 +39,7 @@ export interface MessageWithProfiles {
   content: string | null;
   image_url: string | null;
   lcd_teaser: string | null;
-  print_status: "pending" | "approved" | "completed" | "failed" | "queued";
+  print_status: MessagePrintStatus;
   printed_at: string | null;
   created_at: string;
   updated_at: string;
