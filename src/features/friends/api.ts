@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase/client";
 import { friendToasts } from "@/lib/toasts";
 import { SEARCH_RESULT_LIMIT, MIN_BATCH_FRIENDS_COUNT } from "../constants";
 import { handleApiError, logger } from "../utils";
+import { sendFriendRequestNotification, sendCloseFriendRequestNotification } from "@/lib/push-notification-service";
 import type {
   UserProfile,
   Friendship,
@@ -133,6 +134,26 @@ export async function addFriend(
       .single();
 
     if (error) throw error;
+
+    // 푸시 알림 전송
+    try {
+      const { data: senderProfile } = await supabase
+        .from("users")
+        .select("display_name, avatar_url")
+        .eq("id", currentUserId)
+        .single();
+
+      await sendFriendRequestNotification(
+        request.friend_id,
+        currentUserId,
+        senderProfile?.display_name || "익명",
+        data.id,
+        senderProfile?.avatar_url
+      );
+    } catch (pushError) {
+      console.warn("친구 요청 푸시 알림 전송 실패:", pushError);
+    }
+
     return data;
   } catch (error) {
     handleApiError("FRIEND_ADD_FAILED", error);
@@ -337,13 +358,32 @@ export async function sendCloseFriendRequest(
     console.log(`✅ 모든 검증 통과, 친한친구 신청 진행`);
 
     // 4. 친한친구 신청 생성
-    const { error } = await supabase.from("close_friend_requests").insert({
+    const { data: requestData, error } = await supabase.from("close_friend_requests").insert({
       requester_id: currentUserId,
       target_id: targetUserId,
       status: "pending",
-    });
+    }).select().single();
 
     if (error) throw error;
+
+    // 푸시 알림 전송
+    try {
+      const { data: senderProfile } = await supabase
+        .from("users")
+        .select("display_name, avatar_url")
+        .eq("id", currentUserId)
+        .single();
+
+      await sendCloseFriendRequestNotification(
+        targetUserId,
+        currentUserId,
+        senderProfile?.display_name || "익명",
+        requestData.id,
+        senderProfile?.avatar_url
+      );
+    } catch (pushError) {
+      console.warn("친한친구 요청 푸시 알림 전송 실패:", pushError);
+    }
 
     console.log(`🎉 친한친구 신청 완료: ${currentUserId} → ${targetUserId}`);
   } catch (error) {
