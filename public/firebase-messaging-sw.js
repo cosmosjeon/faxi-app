@@ -5,63 +5,65 @@ try {
   // Firebase SDK 임포트 (안정적인 v10 버전 사용)
   importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js');
   importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js');
+  importScripts('/firebase-config.js');
 
-  // Firebase 설정
-  const firebaseConfig = {
-    apiKey: "AIzaSyA67t-32F3Ye6Z3CwZnTbG0cBVr7Auwk70",
-    authDomain: "faxi-project-af213.firebaseapp.com",
-    projectId: "faxi-project-af213",
-    storageBucket: "faxi-project-af213.firebasestorage.app",
-    messagingSenderId: "114890569305",
-    appId: "1:114890569305:web:376bd1addd38e75ba36348"
-  };
+  // Firebase 설정 (외부 구성 로드)
+  const firebaseConfig = (typeof self !== 'undefined' && self.FAXI_FIREBASE_CONFIG)
+    ? self.FAXI_FIREBASE_CONFIG
+    : null;
 
   // Firebase 초기화
-  if (!firebase.apps.length) {
+  if (firebaseConfig && !firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
+  } else if (!firebaseConfig) {
+    console.error('Firebase 설정을 불러오지 못했습니다. /firebase-config.js 확인');
   }
   
-  const messaging = firebase.messaging();
+  const messaging = firebase.apps.length ? firebase.messaging() : null;
 
   // 백그라운드 메시지 처리
-  messaging.onBackgroundMessage((payload) => {
-    const receiveTime = new Date().toLocaleTimeString();
-    console.log(`[${receiveTime}] 백그라운드 메시지 수신:`, payload);
+  if (messaging) {
+    messaging.onBackgroundMessage((payload) => {
+      const receiveTime = new Date().toLocaleTimeString();
+      console.log(`[${receiveTime}] 백그라운드 메시지 수신:`, payload);
 
-    const { notification, data } = payload;
-    const senderProfileImage = data?.senderProfileImage || '/icons/default-avatar.png';
-    
-    // 알림 옵션 설정
-    const notificationOptions = {
-      body: notification?.body || '새 메시지가 도착했습니다',
-      icon: senderProfileImage,
-      badge: '/icons/faxi-badge.png',
-      tag: `faxi-${data?.type || 'message'}-${data?.senderId || 'unknown'}`,
-      renotify: true,
-      requireInteraction: data?.type === 'new_message',
-      image: data?.messageImage,
-      data: {
-        ...data,
-        url: data?.url || '/',
-        timestamp: Date.now(),
-        senderId: data?.senderId,
-        messageId: data?.messageId
-      },
-      actions: getNotificationActions(data?.type)
-    };
+      const { notification, data } = payload;
+      const senderProfileImage = data?.senderProfileImage || '/icons/default-avatar.png';
+      
+      // 알림 옵션 설정
+      const notificationOptions = {
+        body: notification?.body || '새 메시지가 도착했습니다',
+        icon: senderProfileImage,
+        badge: '/icons/faxi-badge.png',
+        tag: `faxi-${data?.type || 'message'}-${data?.senderId || 'unknown'}`,
+        renotify: true,
+        requireInteraction: data?.type === 'new_message',
+        image: data?.messageImage,
+        data: {
+          ...data,
+          url: data?.url || '/',
+          timestamp: Date.now(),
+          senderId: data?.senderId,
+          messageId: data?.messageId
+        },
+        actions: getNotificationActions(data?.type)
+      };
 
-    // 알림 표시 (디버깅 강화)
-    const title = notification?.title || 'FAXI';
-    console.log('알림 표시 시도:', title, notificationOptions);
-    
-    self.registration.showNotification(title, notificationOptions)
-      .then(() => {
-        console.log('✅ 알림 표시 성공:', title);
-      })
-      .catch((error) => {
-        console.error('❌ 알림 표시 실패:', error);
-      });
-  });
+      // 알림 표시 (디버깅 강화)
+      const title = notification?.title || 'FAXI';
+      console.log('알림 표시 시도:', title, notificationOptions);
+      
+      self.registration.showNotification(title, notificationOptions)
+        .then(() => {
+          console.log('✅ 알림 표시 성공:', title);
+        })
+        .catch((error) => {
+          console.error('❌ 알림 표시 실패:', error);
+        });
+    });
+  } else {
+    console.warn('Firebase Messaging이 초기화되지 않아 백그라운드 메시지를 처리할 수 없습니다.');
+  }
 
 } catch (error) {
   console.error('Firebase Service Worker 초기화 오류:', error);

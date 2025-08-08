@@ -90,10 +90,11 @@ export const getFCMToken = async (): Promise<string | null> => {
     }
   } catch (error) {
     console.error('❌ FCM 토큰 발급 중 오류:', error);
+    const err = error as { name?: unknown; message?: unknown; code?: unknown };
     console.error('에러 상세:', {
-      name: error.name,
-      message: error.message,
-      code: error.code
+      name: typeof err.name === 'string' ? err.name : 'unknown',
+      message: typeof err.message === 'string' ? err.message : 'unknown',
+      code: typeof err.code === 'string' ? err.code : 'unknown'
     });
     return null;
   }
