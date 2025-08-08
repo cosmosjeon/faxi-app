@@ -42,3 +42,24 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# --- security: generated public configs (should not be committed) ---
+# If you generate Firebase SW config from env, keep the generated file untracked
+public/firebase-config.js
+
+# If you later switch to generating the SW file itself, ignore it too (currently tracked)
+# public/firebase-messaging-sw.js
+
+# Local-only docs that may contain sensitive values
+*.local.md
+
+# --- security: common secret file patterns ---
+# Firebase / GCP service accounts and keys
+serviceAccount*.json
+*service-account*.json
+*.p8
+*.p12
+*.key
+*.keystore
+*.jks
+*.der

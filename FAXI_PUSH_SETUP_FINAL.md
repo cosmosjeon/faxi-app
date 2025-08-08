@@ -21,28 +21,28 @@ case 'new_message':
 ```
 
 ### 2. ⚠️ Firebase 설정값 확인 필요
-**현재 Service Worker에 실제 Firebase 설정이 입력되어 있지만**, `.env.local` 파일과 일치하는지 확인:
+Service Worker는 `/public/firebase-config.js`에서 설정을 로드합니다. 이 파일은 빌드/실행 시 `.env.local` 값으로 자동 생성됩니다.
 
-**Service Worker에 입력된 값:**
+**자동 생성되는 설정 예시:**
 ```javascript
 const firebaseConfig = {
-  apiKey: "AIzaSyA67t-32F3Ye6Z3CwZnTbG0cBVr7Auwk70",
-  authDomain: "faxi-project-af213.firebaseapp.com",
-  projectId: "faxi-project-af213",
-  storageBucket: "faxi-project-af213.firebasestorage.app",
-  messagingSenderId: "114890569305",
-  appId: "1:114890569305:web:376bd1addd38e75ba36348"
+  apiKey: "<YOUR_FIREBASE_API_KEY>",
+  authDomain: "<YOUR_FIREBASE_AUTH_DOMAIN>",
+  projectId: "<YOUR_FIREBASE_PROJECT_ID>",
+  storageBucket: "<YOUR_FIREBASE_STORAGE_BUCKET>",
+  messagingSenderId: "<YOUR_FIREBASE_MESSAGING_SENDER_ID>",
+  appId: "<YOUR_FIREBASE_APP_ID>"
 };
 ```
 
 **`.env.local`에 다음 값들이 동일하게 설정되어야 함:**
 ```
-NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyA67t-32F3Ye6Z3CwZnTbG0cBVr7Auwk70
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=faxi-project-af213.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=faxi-project-af213
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=faxi-project-af213.firebasestorage.app
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=114890569305
-NEXT_PUBLIC_FIREBASE_APP_ID=1:114890569305:web:376bd1addd38e75ba36348
+NEXT_PUBLIC_FIREBASE_API_KEY=<YOUR_FIREBASE_API_KEY>
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=<YOUR_FIREBASE_AUTH_DOMAIN>
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=<YOUR_FIREBASE_PROJECT_ID>
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=<YOUR_FIREBASE_STORAGE_BUCKET>
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=<YOUR_FIREBASE_MESSAGING_SENDER_ID>
+NEXT_PUBLIC_FIREBASE_APP_ID=<YOUR_FIREBASE_APP_ID>
 NEXT_PUBLIC_FIREBASE_VAPID_KEY=[Firebase Console에서 생성 필요]
 ```
 
