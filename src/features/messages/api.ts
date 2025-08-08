@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase/client";
 import { messageToasts, imageToasts } from "@/lib/toasts";
 import { MAX_MESSAGE_LENGTH, MAX_TEASER_LENGTH, MAX_IMAGE_SIZE } from "../constants";
 import { handleApiError, logger } from "../utils";
+import { sendNewMessageNotification, sendAutoPrintStatusNotification } from "@/lib/push-notification-service";
 import type {
   Message,
   SendMessageRequest,
@@ -140,6 +141,79 @@ export async function sendMessage(
       .single();
 
     if (error) throw error;
+
+    // 푸시 알림 전송 (친한친구 여부에 따라 다른 알림)
+    try {
+      const { data: senderProfile } = await supabase
+        .from("users")
+        .select("display_name, avatar_url")
+        .eq("id", senderId)
+        .single();
+
+      // 친한친구 관계 확인
+      const { data: isCloseFriend, error: closeFriendError } = await supabase.rpc("are_close_friends", {
+        user1_id: senderId,
+        user2_id: request.receiver_id
+      });
+
+      if (isCloseFriend) {
+        // 친한친구: 2단계 알림
+        
+        // 1단계: 일반 메시지 알림
+        await sendNewMessageNotification(
+          request.receiver_id,
+          senderId,
+          senderProfile?.display_name || "익명",
+          request.content || "사진을 보냈습니다",
+          data.id,
+          senderProfile?.avatar_url
+        );
+
+        // 프린터 연결 상태 확인
+        const { data: printerConnection } = await supabase
+          .from("printer_connections")
+          .select("is_active")
+          .eq("user_id", request.receiver_id)
+          .eq("is_active", true)
+          .single();
+
+        // 2단계: 자동 출력 상태 알림 (0.5초 후)
+        setTimeout(async () => {
+          if (printerConnection) {
+            // 프린터 연결됨
+            await sendAutoPrintStatusNotification(
+              request.receiver_id,
+              senderId,
+              "FAXI",
+              "친한친구 메시지가 자동으로 출력됩니다!",
+              data.id
+            );
+          } else {
+            // 프린터 미연결
+            await sendAutoPrintStatusNotification(
+              request.receiver_id,
+              senderId,
+              "FAXI", 
+              "즉시 출력하려면 프린터를 연결해주세요!",
+              data.id
+            );
+          }
+        }, 500);
+      } else {
+        // 일반친구: 승인 요청 알림
+        await sendNewMessageNotification(
+          request.receiver_id,
+          senderId,
+          senderProfile?.display_name || "익명",
+          request.content || "사진을 보냈습니다",
+          data.id,
+          senderProfile?.avatar_url
+        );
+      }
+    } catch (pushError) {
+      console.warn("푸시 알림 전송 실패:", pushError);
+    }
+
     return data;
   } catch (error) {
     handleApiError("MESSAGE_SEND_FAILED", error);

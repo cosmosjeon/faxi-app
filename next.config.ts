@@ -30,11 +30,11 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'", // 기본적으로 같은 출처만 허용
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com https://tkzfnkuwflexqcurngrr.supabase.co", // 스크립트 허용 도메인
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com https://tkzfnkuwflexqcurngrr.supabase.co https://www.gstatic.com", // 스크립트 허용 도메인 (Firebase CDN 추가)
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", // 스타일 허용 도메인
               "font-src 'self' https://fonts.gstatic.com", // 폰트 허용 도메인
               "img-src 'self' data: https: blob:", // 이미지 허용 도메인
-              "connect-src 'self' https://tkzfnkuwflexqcurngrr.supabase.co https://accounts.google.com https://apis.google.com wss://tkzfnkuwflexqcurngrr.supabase.co", // API 연결 허용 도메인
+              "connect-src 'self' https://tkzfnkuwflexqcurngrr.supabase.co https://accounts.google.com https://apis.google.com wss://tkzfnkuwflexqcurngrr.supabase.co https://fcmregistrations.googleapis.com https://firebase.googleapis.com https://firebaseinstallations.googleapis.com", // API 연결 허용 도메인 (Firebase Installation API 추가)
               "frame-src 'self' https://accounts.google.com https://content.googleapis.com", // iframe 허용 도메인
             ].join("; "), // 세미콜론으로 구분된 문자열로 결합
           },

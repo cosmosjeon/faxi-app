@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/components/auth-provider";
 import { RealtimeProvider } from "@/components/RealtimeProvider";
+import { PushNotificationInitializer } from "@/components/PushNotificationInitializer";
 import { useState } from "react";
 
 // QueryClient 기본 설정
@@ -29,6 +30,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           {children}
         </RealtimeProvider>
         <Toaster />
+        <PushNotificationInitializer />
       </AuthProvider>
     </QueryClientProvider>
   );

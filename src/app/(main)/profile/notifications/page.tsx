@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useAuthStore } from "@/stores/auth.store";
 import { useToast } from "@/hooks/use-toast";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import {
   getUserSettings,
   updateNotificationSettings,
@@ -23,6 +24,13 @@ export default function NotificationSettingsPage() {
   const router = useRouter();
   const { profile } = useAuthStore();
   const { toast } = useToast();
+  const { 
+    setupPushNotifications, 
+    canSetup, 
+    isSupported, 
+    permission,
+    isGranted 
+  } = usePushNotifications();
 
   const [settings, setSettings] = useState<NotificationSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -333,6 +341,34 @@ export default function NotificationSettingsPage() {
                 }
                 disabled={isSaving}
               />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label className="text-sm font-medium">푸시 알림</Label>
+                <p className="text-xs text-gray-600">
+                  앱이 백그라운드일 때 시스템 알림 표시
+                </p>
+              </div>
+              <div className="space-y-2">
+                {isGranted ? (
+                  <div className="text-xs text-green-600">✅ 설정 완료</div>
+                ) : canSetup ? (
+                  <Button
+                    size="sm"
+                    onClick={setupPushNotifications}
+                    disabled={!isSupported}
+                  >
+                    {!isSupported ? "지원 안됨" : "설정하기"}
+                  </Button>
+                ) : permission === 'denied' ? (
+                  <div className="text-xs text-red-600">❌ 권한 거부됨</div>
+                ) : (
+                  <div className="text-xs text-gray-500">로딩 중...</div>
+                )}
+              </div>
             </div>
 
             <Separator />
