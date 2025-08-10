@@ -42,6 +42,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase/client";
 import { useRealtimeDataSync } from "@/hooks/useRealtimeDataSync";
 import { FriendListSkeleton } from "@/components/ui/friend-skeleton";
+ 
 
 export default function FriendsPage() {
   const { profile } = useAuthStore();
@@ -58,6 +59,7 @@ export default function FriendsPage() {
   const [friendsCloseFriendStatus, setFriendsCloseFriendStatus] = useState<
     Record<string, boolean>
   >({});
+  
 
   // 친한친구 상태 구분 헬퍼 함수
   const getCloseFriendStatus = (friendId: string) => {
@@ -536,10 +538,13 @@ export default function FriendsPage() {
     }
   };
 
+  
+
   // 노션 스타일 친한친구 카드 컴포넌트
   const CloseFriendCard = ({ friend }: { friend: FriendWithProfile }) => {
     const status = getCloseFriendStatus(friend.friend_id);
     const isUpdating = updatingFriendIds.has(friend.friend_id);
+    
 
     const getStatusConfig = () => {
       switch (status) {
@@ -645,7 +650,7 @@ export default function FriendsPage() {
         className={`flex items-center justify-between p-3 rounded-lg border ${config.borderColor} ${config.bgColor} hover:shadow-sm transition-shadow duration-200`}
       >
         <div className="flex items-center gap-3">
-          <Avatar className="h-12 w-12">
+            <Avatar className="h-12 w-12">
             <AvatarImage
               src={friend.friend_profile?.avatar_url || ""}
               alt={friend.friend_profile?.display_name || ""}
@@ -659,9 +664,7 @@ export default function FriendsPage() {
             <h3 className="font-medium text-gray-900">
               {friend.friend_profile.display_name}
             </h3>
-            <p className="text-sm text-gray-600">
-              @{friend.friend_profile.username}
-            </p>
+            <p className="text-sm text-gray-600">@{friend.friend_profile.username}</p>
             {config.statusText && (
               <div className="flex items-center gap-1 mt-1">
                 {config.icon}

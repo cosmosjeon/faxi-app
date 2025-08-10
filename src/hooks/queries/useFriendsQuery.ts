@@ -33,12 +33,14 @@ export function useFriendsQuery(userId: string | undefined) {
  * 사용자 검색 쿼리
  */
 export function useSearchUsersQuery(username: string, enabled: boolean = true) {
+  const { user } = useAuthStore();
   return useQuery({
-    queryKey: ["searchUsers", username],
-    queryFn: () => searchUserByUsername(username),
-    enabled: enabled && username.trim().length > 0,
-    staleTime: 2 * 60 * 1000, // 2분 캐시
+    queryKey: ["searchUsers", username, user?.id],
+    queryFn: () => searchUserByUsername(username, user?.id || ""),
+    enabled: enabled && username.trim().length > 0 && !!user?.id,
+    staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev,
   });
 }
 
