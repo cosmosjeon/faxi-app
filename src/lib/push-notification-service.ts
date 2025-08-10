@@ -18,20 +18,20 @@ interface PushNotificationData {
 
 export const sendPushNotification = async (payload: PushNotificationData) => {
   try {
-    console.log('푸시 알림 요청:', payload)
+    if (process.env.NODE_ENV !== 'production') console.log('푸시 알림 요청:', payload)
     
     const { data, error } = await supabase.functions.invoke('send-push-notification', {
       body: payload
     })
     
-    console.log('Edge Function 응답:', { data, error })
+    if (process.env.NODE_ENV !== 'production') console.log('Edge Function 응답:', { data, error })
     
     if (error) {
       console.error('푸시 알림 전송 실패:', error)
       return { success: false, error }
     }
     
-    console.log('푸시 알림 전송 성공:', data)
+    if (process.env.NODE_ENV !== 'production') console.log('푸시 알림 전송 성공:', data)
     return { success: true, data }
   } catch (error) {
     console.error('푸시 알림 서비스 오류:', error)

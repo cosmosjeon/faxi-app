@@ -48,6 +48,7 @@ export const RealtimeProvider = ({
     enabled: isRealtimeEnabled,
   });
 
+
   // 실시간 알림 관리 (백그라운드에서 자동 실행)
   useRealtimeNotifications({
     enabled: isRealtimeEnabled && enableNotifications,

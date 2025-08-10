@@ -42,18 +42,20 @@ export default function NotificationSettingsPage() {
 
     const loadSettings = async () => {
       try {
-        console.log("🔄 알림 설정 로드 시작:", profile.id);
 
         const userSettings = await getUserSettings(profile.id);
 
-        console.log("📋 가져온 사용자 설정:", {
-          raw: userSettings,
-          hasMessageNotifications:
-            "message_notifications" in (userSettings || {}),
-          hasMarketingNotifications:
-            "marketing_notifications" in (userSettings || {}),
-          hasAutoprint: "auto_print_close_friends" in (userSettings || {}),
-        });
+        // 개발 환경에서만 디버깅 정보 출력
+        if (process.env.NODE_ENV !== 'production') {
+          console.log("📋 가져온 사용자 설정:", {
+            raw: userSettings,
+            hasMessageNotifications:
+              "message_notifications" in (userSettings || {}),
+            hasMarketingNotifications:
+              "marketing_notifications" in (userSettings || {}),
+            hasAutoprint: "auto_print_close_friends" in (userSettings || {}),
+          });
+        }
 
         if (userSettings) {
           // DB에서 가져온 실제 값 사용, 없으면 기본값 적용
@@ -68,7 +70,9 @@ export default function NotificationSettingsPage() {
           console.log("✅ 로드된 알림 설정:", notificationSettings);
           setSettings(notificationSettings);
         } else {
-          console.warn("⚠️ 사용자 설정이 없음, 기본값 사용");
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn("⚠️ 사용자 설정이 없음, 기본값 사용");
+          }
 
           // 사용자 설정이 아예 없는 경우 기본값
           const defaultSettings: NotificationSettings = {
@@ -109,19 +113,23 @@ export default function NotificationSettingsPage() {
     value: boolean | string
   ) => {
     if (!profile?.id || !settings) {
-      console.warn("⚠️ 필수 데이터 누락:", {
-        profileId: profile?.id,
-        settings: !!settings,
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn("⚠️ 필수 데이터 누락:", {
+          profileId: profile?.id,
+          settings: !!settings,
+        });
+      }
       return;
     }
 
-    console.log("🔄 설정 변경 시작:", {
-      key,
-      value,
-      userId: profile.id,
-      originalValue: settings[key],
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("🔄 설정 변경 시작:", {
+        key,
+        value,
+        userId: profile.id,
+        originalValue: settings[key],
+      });
+    }
 
     // 클라이언트 사이드 검증
     if (typeof value !== "boolean") {
@@ -141,7 +149,9 @@ export default function NotificationSettingsPage() {
 
     // 값 변경이 없으면 스킵
     if (settings[key] === value) {
-      console.log("⏭️ 동일한 값으로 변경 시도, 스킵");
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("⏭️ 동일한 값으로 변경 시도, 스킵");
+      }
       return;
     }
 
@@ -160,7 +170,9 @@ export default function NotificationSettingsPage() {
         settings: { [key]: value } as Partial<NotificationSettings>,
       };
 
-      console.log("📤 서버 업데이트 요청:", updateRequest);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("📤 서버 업데이트 요청:", updateRequest);
+      }
 
       // 네트워크 연결 상태 확인 (가능한 경우)
       if (
@@ -173,14 +185,18 @@ export default function NotificationSettingsPage() {
 
       const result = await updateNotificationSettings(updateRequest);
 
-      console.log("📥 서버 응답:", result);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("📥 서버 응답:", result);
+      }
 
       if (!result.success) {
         throw new Error(result.error || "알 수 없는 오류가 발생했습니다.");
       }
 
       // 성공 시 최신 설정을 다시 불러와서 동기화 보장
-      console.log("✅ 업데이트 성공, 최신 설정 재로드");
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("✅ 업데이트 성공, 최신 설정 재로드");
+      }
 
       const refreshedSettings = await getUserSettings(profile.id);
       if (refreshedSettings) {
@@ -193,7 +209,9 @@ export default function NotificationSettingsPage() {
         };
 
         setSettings(syncedSettings);
-        console.log("🔄 설정 동기화 완료:", syncedSettings);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log("🔄 설정 동기화 완료:", syncedSettings);
+        }
       }
 
       toast({
@@ -218,7 +236,9 @@ export default function NotificationSettingsPage() {
 
       // 실패 시 원래 설정으로 롤백
       setSettings(originalSettings);
-      console.log("🔄 설정 롤백 완료:", originalSettings);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("🔄 설정 롤백 완료:", originalSettings);
+      }
 
       // 사용자 친화적 에러 메시지 생성
       let userFriendlyMessage = "설정을 저장하는데 실패했습니다.";
@@ -413,18 +433,13 @@ export default function NotificationSettingsPage() {
             </div>
 
             {/* 개발 정보 (개발 중에만 표시) */}
-            <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-              <p className="text-xs text-green-800">
-                <strong>✅ 개발 완료:</strong> 알림 설정이 데이터베이스와 완전히
-                연결되었습니다. 설정 변경이 실시간으로 저장되고 페이지 새로고침
-                시에도 유지됩니다.
-              </p>
-              <p className="text-xs text-green-700 mt-1">
-                만약 마이그레이션 오류가 발생하면{" "}
-                <code className="bg-green-100 px-1 rounded">quick_fix.sql</code>
-                을 실행하세요.
-              </p>
-            </div>
+            {process.env.NODE_ENV !== 'production' && (
+              <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                <p className="text-xs text-green-800">
+                  <strong>✅ 개발 안내:</strong> 설정 변경은 DB에 저장되며 새로고침 후에도 유지됩니다.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

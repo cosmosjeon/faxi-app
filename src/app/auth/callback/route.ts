@@ -7,10 +7,12 @@ export async function GET(request: NextRequest) {
   const error_description = searchParams.get("error_description");
   let next = searchParams.get("next") ?? "/";
 
-  console.log("=== OAuth Callback Debug ===");
-  console.log("Full URL:", request.url);
-  console.log("Error param:", error_param);
-  console.log("Error description:", error_description);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log("=== OAuth Callback Debug ===");
+    console.log("Full URL:", request.url);
+    console.log("Error param:", error_param);
+    console.log("Error description:", error_description);
+  }
 
   if (!next.startsWith("/")) {
     next = "/";
@@ -25,7 +27,9 @@ export async function GET(request: NextRequest) {
 
   // Implicit 플로우에서는 코드 교환이 필요 없음
   // Supabase가 자동으로 URL에서 세션을 감지하고 처리함
-  console.log("✅ Implicit flow - redirecting to:", next);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log("✅ Implicit flow - redirecting to:", next);
+  }
 
   // 환경별 리디렉션 처리
   const forwardedHost = request.headers.get("x-forwarded-host");

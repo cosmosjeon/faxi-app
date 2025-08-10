@@ -105,7 +105,9 @@ export default function OnboardingPage() {
         throw new Error("로그인 세션이 만료되었습니다. 다시 로그인해주세요.");
       }
 
-      console.log("현재 세션:", session.user.id);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("현재 세션:", session.user.id);
+      }
 
       // 사용자명 중복 확인
       const { data: existingUser, error: checkError } = await supabase
@@ -137,7 +139,9 @@ export default function OnboardingPage() {
         is_active: true,
       };
 
-      console.log("프로필 데이터:", profileData);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("프로필 데이터:", profileData);
+      }
 
       // Supabase에 프로필 저장
       const { data: newProfile, error } = await supabase

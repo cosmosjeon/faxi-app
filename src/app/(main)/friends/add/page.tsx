@@ -38,8 +38,8 @@ export default function AddFriendPage() {
     }
 
     setIsSearching(true);
-    try {
-      const results = await searchUserByUsername(searchQuery);
+      try {
+      const results = await searchUserByUsername(searchQuery, profile?.id || "");
       // 자신은 검색 결과에서 제외
       const filteredResults = results.filter(
         (result) => result.user.id !== profile?.id

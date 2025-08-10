@@ -46,6 +46,9 @@ export default function ComposePage() {
   const [isSending, setIsSending] = useState(false);
   const [editMode, setEditMode] = useState<"compose" | "imageEdit">("compose");
   const [originalImageFile, setOriginalImageFile] = useState<File | null>(null);
+  // 다중 수신자 선택 상태
+  const [selectedRecipientIds, setSelectedRecipientIds] = useState<string[]>([]);
+  const [recipientSearch, setRecipientSearch] = useState<string>("");
 
 
   // 폼 데이터
@@ -122,12 +125,24 @@ export default function ComposePage() {
     }
   };
 
-  // 친구 선택 핸들러
-  const handleReceiverChange = (receiverId: string) => {
-    setFormData((prev) => ({ ...prev, receiver_id: receiverId }));
-    if (errors.receiver_id) {
-      setErrors((prev) => ({ ...prev, receiver_id: undefined }));
-    }
+  // 수신자 추가/제거 핸들러
+  const addRecipient = (friendId: string) => {
+    setSelectedRecipientIds((prev) => {
+      if (prev.includes(friendId)) return prev;
+      const next = [...prev, friendId];
+      if (errors.receiver_id) {
+        setErrors((e) => ({ ...e, receiver_id: undefined }));
+      }
+      return next;
+    });
+  };
+
+  const removeRecipient = (friendId: string) => {
+    setSelectedRecipientIds((prev) => prev.filter((id) => id !== friendId));
+  };
+
+  const clearRecipients = () => {
+    setSelectedRecipientIds([]);
   };
 
   // 이미지 선택 핸들러
@@ -219,35 +234,66 @@ export default function ComposePage() {
   const handleSend = async () => {
     if (!profile) return;
 
-    // 유효성 검사
-    const validationErrors = validateMessageForm(formData);
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
+    // 유효성 검사 (내용/이미지 중심) + 다중 수신자 확인
+    const validationErrors = validateMessageForm({
+      ...formData,
+      // 최소 1명 선택 필요. 선택된 첫 번째 아이디로 기본 검증 통과 처리
+      receiver_id: selectedRecipientIds[0] || "",
+    });
+
+    const mergedErrors = { ...validationErrors } as MessageFormErrors;
+    if (selectedRecipientIds.length === 0) {
+      mergedErrors.receiver_id = "받는 사람을 한 명 이상 선택해주세요.";
+    }
+
+    if (Object.keys(mergedErrors).length > 0) {
+      setErrors(mergedErrors);
       return;
     }
 
     setIsSending(true);
     try {
-      await sendMessage({
-        receiver_id: formData.receiver_id,
-        content: formData.content || undefined,
-        image_file: formData.image_file || undefined,
-        lcd_teaser: formData.lcd_teaser || undefined,
-      }, profile.id);
+      // 선택된 모든 수신자에게 병렬 전송
+      const tasks = selectedRecipientIds.map((receiverId) =>
+        sendMessage(
+          {
+            receiver_id: receiverId,
+            content: formData.content || undefined,
+            image_file: formData.image_file || undefined,
+            lcd_teaser: formData.lcd_teaser || undefined,
+          },
+          profile.id
+        )
+      );
 
-      toast({
-        title: "메시지 전송 완료",
-        description: "메시지가 성공적으로 전송되었습니다.",
-      });
+      const results = await Promise.allSettled(tasks);
+      const successCount = results.filter((r) => r.status === "fulfilled").length;
+      const failCount = results.length - successCount;
+
+      if (successCount > 0) {
+        toast({
+          title: "메시지 전송 완료",
+          description: `${successCount}명에게 전송되었습니다${failCount > 0 ? ` (${failCount}명 실패)` : ""}.`,
+        });
+      }
+      if (failCount > 0 && successCount === 0) {
+        toast({
+          title: "메시지 전송 실패",
+          description: "모든 수신자에게 전송하지 못했습니다. 잠시 후 다시 시도해주세요.",
+          variant: "destructive",
+        });
+      }
 
       // 폼 초기화
       setFormData({
-        receiver_id: "",
+        receiver_id: "", // 다중 전송에서는 사용하지 않지만 타입 유지
         content: "",
         image_file: null,
         lcd_teaser: "",
       });
       setImagePreview(null);
+      clearRecipients();
+      setRecipientSearch("");
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -266,17 +312,27 @@ export default function ComposePage() {
     }
   };
 
-  // 선택된 친구 정보
-  const selectedFriend = friends.find(
-    (f) => f.friend_id === formData.receiver_id
+  // 수신자 검색/필터링 파생값
+  const selectedRecipients = friends.filter((f) =>
+    selectedRecipientIds.includes(f.friend_id)
   );
+  const availableFriends = friends.filter(
+    (f) => !selectedRecipientIds.includes(f.friend_id)
+  );
+  const filteredFriends = (recipientSearch.trim()
+    ? availableFriends.filter((f) =>
+        f.friend_profile.display_name
+          .toLowerCase()
+          .includes(recipientSearch.toLowerCase())
+      )
+    : availableFriends
+  ).slice(0, 20);
 
   // 전송 가능 여부
   const canSend =
-    formData.receiver_id &&
+    selectedRecipientIds.length > 0 &&
     (formData.content.trim() || formData.image_file) &&
-    !isSending &&
-    Object.keys(errors).length === 0;
+    !isSending;
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -324,7 +380,7 @@ export default function ComposePage() {
         {/* 메시지 작성 모드 */}
         {editMode === "compose" && (
           <>
-            {/* 받는 사람 선택 */}
+            {/* 받는 사람 선택 (다중) */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -355,44 +411,70 @@ export default function ComposePage() {
                     </Button>
                   </div>
                 ) : (
-                  <Select
-                    value={formData.receiver_id}
-                    onValueChange={handleReceiverChange}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="친구 선택하기...">
-                        {selectedFriend && (
-                          <div className="flex items-center gap-2">
+                  <div className="space-y-3">
+                    {/* 선택된 수신자 칩 */}
+                    {selectedRecipients.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedRecipients.map((f) => (
+                          <div
+                            key={f.friend_id}
+                            className="inline-flex items-center gap-2 bg-gray-100 rounded-full pl-1 pr-2 py-1"
+                          >
                             <Avatar className="h-6 w-6">
                               <AvatarImage
-                                src={
-                                  selectedFriend.friend_profile.avatar_url || ""
-                                }
-                                alt={selectedFriend.friend_profile.display_name}
+                                src={f.friend_profile.avatar_url || ""}
+                                alt={f.friend_profile.display_name}
                               />
                               <AvatarFallback className="text-xs">
-                                {selectedFriend.friend_profile.display_name[0]?.toUpperCase()}
+                                {f.friend_profile.display_name[0]?.toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
-                            <span>
-                              {selectedFriend.friend_profile.display_name}
-                            </span>
-                            {selectedFriend.is_close_friend && (
-                              <span className="text-xs bg-red-100 text-red-600 px-1 rounded">
-                                친한친구
-                              </span>
-                            )}
+                            <span className="text-sm">{f.friend_profile.display_name}</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => removeRecipient(f.friend_id)}
+                              aria-label="수신자 제거"
+                            >
+                              <X size={14} />
+                            </Button>
                           </div>
-                        )}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {friends.map((friend) => (
-                        <SelectItem
-                          key={friend.friend_id}
-                          value={friend.friend_id}
-                        >
-                          <div className="flex items-center gap-2">
+                        ))}
+                      </div>
+                    )}
+
+                    {/* 선택 요약 + 모두 지우기 */}
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-gray-600">
+                        총 {selectedRecipientIds.length}명 선택됨
+                      </p>
+                      {selectedRecipientIds.length > 0 && (
+                        <Button variant="ghost" size="sm" onClick={clearRecipients}>
+                          모두 지우기
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* 검색 인풋 */}
+                    <Input
+                      placeholder="이름으로 검색..."
+                      value={recipientSearch}
+                      onChange={(e) => setRecipientSearch(e.target.value)}
+                    />
+
+                    {/* 검색 결과 리스트 */}
+                    <div className="border rounded-md divide-y max-h-56 overflow-auto">
+                      {filteredFriends.length === 0 ? (
+                        <div className="p-3 text-sm text-gray-500">검색 결과가 없습니다</div>
+                      ) : (
+                        filteredFriends.map((friend) => (
+                          <button
+                            type="button"
+                            key={friend.friend_id}
+                            className="w-full text-left p-2 hover:bg-gray-50 flex items-center gap-2"
+                            onClick={() => addRecipient(friend.friend_id)}
+                          >
                             <Avatar className="h-6 w-6">
                               <AvatarImage
                                 src={friend.friend_profile.avatar_url || ""}
@@ -402,17 +484,17 @@ export default function ComposePage() {
                                 {friend.friend_profile.display_name[0]?.toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
-                            <span>{friend.friend_profile.display_name}</span>
+                            <span className="text-sm">{friend.friend_profile.display_name}</span>
                             {friend.is_close_friend && (
-                              <span className="text-xs bg-red-100 text-red-600 px-1 rounded">
+                              <span className="ml-auto text-xs bg-red-100 text-red-600 px-1 rounded">
                                 친한친구
                               </span>
                             )}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -543,20 +625,6 @@ export default function ComposePage() {
               <Send size={20} />
               메시지 전송
             </LoadingButton>
-
-            {/* 안내 메시지 */}
-            {selectedFriend?.is_close_friend && (
-              <Card className="border-green-200 bg-green-50">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 text-green-700">
-                    <Check size={16} />
-                    <p className="text-sm">
-                      친한 친구에게 보내는 메시지는 자동으로 프린트됩니다.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </>
         )}
       </div>

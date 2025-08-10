@@ -53,12 +53,14 @@ export default function HomePage() {
 
   // 프린터 상태 실시간 모니터링 (디버깅용)
   useEffect(() => {
-    console.log("🔄 프린터 상태 변화 감지:", {
-      status: printer.status,
-      isConnected: printer.isConnected,
-      connectedPrinter: printer.connectedPrinter,
-      timestamp: new Date().toLocaleTimeString(),
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("🔄 프린터 상태 변화 감지:", {
+        status: printer.status,
+        isConnected: printer.isConnected,
+        connectedPrinter: printer.connectedPrinter,
+        timestamp: new Date().toLocaleTimeString(),
+      });
+    }
   }, [printer.status, printer.isConnected, printer.connectedPrinter]);
   const [messages, setMessages] = useState<MessageWithProfiles[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -103,7 +105,9 @@ export default function HomePage() {
   useRealtimeDataSync({
     onDataUpdate: async () => {
       if (!profile) return;
-      console.log("🔄 실시간 메시지 동기화 트리거됨");
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("🔄 실시간 메시지 동기화 트리거됨");
+      }
 
       try {
         const messagesList = await getMessagesList(profile.id);
@@ -128,7 +132,8 @@ export default function HomePage() {
     try {
       const messagesList = await getMessagesList(profile.id);
 
-      console.log("📋 전체 메시지 목록 로드:", {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("📋 전체 메시지 목록 로드:", {
         total_count: messagesList.length,
         by_status: {
           pending: messagesList.filter((m) => m.print_status === "pending")
@@ -142,13 +147,15 @@ export default function HomePage() {
           failed: messagesList.filter((m) => m.print_status === "failed")
             .length,
         },
-      });
+        });
+      }
 
       // 받은 메시지 상세 정보 (더 상세하게)
       const receivedMessages = messagesList.filter(
         (m) => m.receiver_id === profile.id
       );
-      console.log("📨 받은 메시지 상세 정보:", {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("📨 받은 메시지 상세 정보:", {
         count: receivedMessages.length,
         messages: receivedMessages.map((m) => ({
           id: m.id,
@@ -156,7 +163,8 @@ export default function HomePage() {
           print_status: m.print_status,
           created_at: m.created_at,
         })),
-      });
+        });
+      }
 
       // 받은 메시지 중 대기중인 메시지만 필터링 (pending + queued)
       const pendingReceivedMessages = messagesList.filter(
@@ -165,14 +173,16 @@ export default function HomePage() {
           (msg.print_status === "pending" || msg.print_status === "queued")
       );
 
-      console.log("📋 UI에 표시할 메시지:", {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("📋 UI에 표시할 메시지:", {
         count: pendingReceivedMessages.length,
         messages: pendingReceivedMessages.map((m) => ({
           id: m.id,
           sender: m.sender_profile.display_name,
           print_status: m.print_status,
         })),
-      });
+        });
+      }
 
       setMessages(pendingReceivedMessages);
 
@@ -182,7 +192,8 @@ export default function HomePage() {
           (msg) => msg.print_status === "approved"
         );
 
-        console.log("🔍 approved 메시지 검사:", {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log("🔍 approved 메시지 검사:", {
           printer_status: printer.status,
           approved_count: approvedMessages.length,
           approved_messages: approvedMessages.map((m) => ({
@@ -190,21 +201,28 @@ export default function HomePage() {
             sender: m.sender_profile.display_name,
             print_status: m.print_status,
           })),
-        });
+          });
+        }
 
         if (approvedMessages.length > 0) {
-          console.log(
-            `🔄 ${approvedMessages.length}개의 approved 메시지를 queued로 변경 시작`
-          );
+          if (process.env.NODE_ENV !== 'production') {
+            console.log(
+              `🔄 ${approvedMessages.length}개의 approved 메시지를 queued로 변경 시작`
+            );
+          }
 
           // 모든 approved 메시지를 순차적으로 처리
           for (const msg of approvedMessages) {
             try {
-              console.log(
-                `🔄 처리 중: ${msg.id} (${msg.sender_profile.display_name})`
-              );
+              if (process.env.NODE_ENV !== 'production') {
+                console.log(
+                  `🔄 처리 중: ${msg.id} (${msg.sender_profile.display_name})`
+                );
+              }
               await updateMessagePrintStatus(msg.id, "queued");
-              console.log(`✅ DB 업데이트 완료: ${msg.id} (approved → queued)`);
+              if (process.env.NODE_ENV !== 'production') {
+                console.log(`✅ DB 업데이트 완료: ${msg.id} (approved → queued)`);
+              }
 
               // UI에서도 상태 업데이트
               setMessages((prev) => {
@@ -220,58 +238,76 @@ export default function HomePage() {
                 }
               });
 
-              console.log(`✅ UI 업데이트 완료: ${msg.id}`);
+              if (process.env.NODE_ENV !== 'production') {
+                console.log(`✅ UI 업데이트 완료: ${msg.id}`);
+              }
             } catch (error) {
               console.error(`❌ 메시지 상태 변경 실패: ${msg.id}`, error);
             }
           }
 
-          console.log("🎯 모든 approved → queued 변경 완료");
+          if (process.env.NODE_ENV !== 'production') {
+            console.log("🎯 모든 approved → queued 변경 완료");
+          }
         } else {
           // approved 메시지가 없다면 pending 메시지 중 친한친구 메시지 확인
-          console.log(
-            "🤔 approved 메시지가 없음 - pending 메시지 중 친한친구 확인"
-          );
+          if (process.env.NODE_ENV !== 'production') {
+            console.log(
+              "🤔 approved 메시지가 없음 - pending 메시지 중 친한친구 확인"
+            );
+          }
           const pendingMessages = receivedMessages.filter(
             (msg) => msg.print_status === "pending"
           );
 
-          console.log("📋 pending 메시지 확인:", {
+          if (process.env.NODE_ENV !== 'production') {
+            console.log("📋 pending 메시지 확인:", {
             pending_count: pendingMessages.length,
             pending_messages: pendingMessages.map((m) => ({
               id: m.id,
               sender: m.sender_profile.display_name,
               print_status: m.print_status,
             })),
-          });
+            });
+          }
 
           if (pendingMessages.length > 0) {
-            console.log("🔍 pending 메시지들의 친한친구 관계 확인 시작");
+            if (process.env.NODE_ENV !== 'production') {
+              console.log("🔍 pending 메시지들의 친한친구 관계 확인 시작");
+            }
 
             for (const msg of pendingMessages) {
               try {
-                console.log(
-                  `🔄 친한친구 관계 확인: ${msg.sender_profile.display_name} (${msg.id})`
-                );
+                if (process.env.NODE_ENV !== 'production') {
+                  console.log(
+                    `🔄 친한친구 관계 확인: ${msg.sender_profile.display_name} (${msg.id})`
+                  );
+                }
                 const isCloseFriend = await areCloseFriends(
                   profile.id,
                   msg.sender_id
                 );
 
-                console.log(
-                  `📊 친한친구 확인 결과: ${msg.sender_profile.display_name} = ${isCloseFriend}`
-                );
+                if (process.env.NODE_ENV !== 'production') {
+                  console.log(
+                    `📊 친한친구 확인 결과: ${msg.sender_profile.display_name} = ${isCloseFriend}`
+                  );
+                }
 
                 if (isCloseFriend) {
-                  console.log(
-                    `💖 친한친구 발견! ${msg.sender_profile.display_name} 메시지를 queued로 변경`
-                  );
+                  if (process.env.NODE_ENV !== 'production') {
+                    console.log(
+                      `💖 친한친구 발견! ${msg.sender_profile.display_name} 메시지를 queued로 변경`
+                    );
+                  }
 
                   // 친한친구 메시지를 queued로 변경
                   await updateMessagePrintStatus(msg.id, "queued");
-                  console.log(
-                    `✅ DB 업데이트 완료: ${msg.id} (pending → queued)`
-                  );
+                  if (process.env.NODE_ENV !== 'production') {
+                    console.log(
+                      `✅ DB 업데이트 완료: ${msg.id} (pending → queued)`
+                    );
+                  }
 
                   // UI 업데이트
                   setMessages((prev) => {
@@ -292,7 +328,9 @@ export default function HomePage() {
                     }
                   });
 
-                  console.log(`✅ UI 업데이트 완료: ${msg.id}`);
+                  if (process.env.NODE_ENV !== 'production') {
+                    console.log(`✅ UI 업데이트 완료: ${msg.id}`);
+                  }
                 }
               } catch (error) {
                 console.error(`❌ 친한친구 확인 실패: ${msg.id}`, error);
@@ -315,16 +353,20 @@ export default function HomePage() {
 
   // 친한친구 메시지 처리 함수
   const handleCloseFriendMessage = async (message: MessageWithProfiles) => {
-    console.log("💖 친한친구 메시지 처리 시작:", {
-      message_id: message.id,
-      sender: message.sender_profile.display_name,
-      printer_status: printer.status,
-      current_print_status: message.print_status,
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("💖 친한친구 메시지 처리 시작:", {
+        message_id: message.id,
+        sender: message.sender_profile.display_name,
+        printer_status: printer.status,
+        current_print_status: message.print_status,
+      });
+    }
 
     if (printer.status === "connected") {
       // 프린터 연결됨: 바로 프린트
-      console.log("🖨️ 프린터 연결됨 - 즉시 프린트 실행");
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("🖨️ 프린터 연결됨 - 즉시 프린트 실행");
+      }
       await handleMessageAction(message.id, "approve", true);
       toast({
         title: "친한 친구의 메시지",
@@ -332,11 +374,15 @@ export default function HomePage() {
       });
     } else {
       // 프린터 연결 안됨: 대기 상태로 설정
-      console.log("⏳ 프린터 미연결 - 메시지를 대기열에 추가");
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("⏳ 프린터 미연결 - 메시지를 대기열에 추가");
+      }
 
       try {
         await updateMessagePrintStatus(message.id, "queued");
-        console.log("✅ DB에 queued 상태 저장 완료:", message.id);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log("✅ DB에 queued 상태 저장 완료:", message.id);
+        }
 
         // UI에서도 상태 업데이트
         setMessages((prev) =>
@@ -346,7 +392,9 @@ export default function HomePage() {
               : msg
           )
         );
-        console.log("✅ UI 상태 업데이트 완료:", message.id);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log("✅ UI 상태 업데이트 완료:", message.id);
+        }
 
         toast({
           title: "친한 친구의 메시지 대기 중",
@@ -364,7 +412,9 @@ export default function HomePage() {
   useEffect(() => {
     if (!profile) return; // 개발 모드에서는 Realtime 구독 안 함
 
-    console.log("🔄 Supabase Realtime 구독 시작");
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("🔄 Supabase Realtime 구독 시작");
+    }
 
     const channel = supabase
       .channel("public:messages")
@@ -377,7 +427,9 @@ export default function HomePage() {
           filter: `receiver_id=eq.${profile.id}`,
         },
         async (payload) => {
-          console.log("📨 Realtime 새 메시지:", payload);
+          if (process.env.NODE_ENV !== 'production') {
+            console.log("📨 Realtime 새 메시지:", payload);
+          }
 
           // 새 메시지 처리
           try {
@@ -385,7 +437,9 @@ export default function HomePage() {
             await loadMessages();
 
             // payload에서 새 메시지 정보 추출하여 처리
-            console.log("새 메시지 처리:", payload.new);
+            if (process.env.NODE_ENV !== 'production') {
+              console.log("새 메시지 처리:", payload.new);
+            }
           } catch (error) {
             console.error("Realtime 메시지 처리 실패:", error);
           }
@@ -394,7 +448,9 @@ export default function HomePage() {
       .subscribe();
 
     return () => {
-      console.log("🔄 Supabase Realtime 구독 해제");
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("🔄 Supabase Realtime 구독 해제");
+      }
       supabase.removeChannel(channel);
     };
   }, [profile]);
@@ -407,14 +463,18 @@ export default function HomePage() {
   ) => {
     // 중복 처리 방지 - 이미 처리 중인 메시지는 무시
     if (processingMessages.has(messageId)) {
-      console.log("⚠️ 메시지 중복 처리 방지:", messageId);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("⚠️ 메시지 중복 처리 방지:", messageId);
+      }
       return;
     }
 
     // 처리할 메시지 찾기
     const messageToProcess = messages.find((msg) => msg.id === messageId);
     if (!messageToProcess) {
-      console.log("⚠️ 처리할 메시지를 찾을 수 없음:", messageId);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("⚠️ 처리할 메시지를 찾을 수 없음:", messageId);
+      }
       return;
     }
 
@@ -423,10 +483,12 @@ export default function HomePage() {
       messageToProcess.print_status !== "pending" &&
       messageToProcess.print_status !== "queued"
     ) {
-      console.log("⚠️ 이미 처리된 메시지:", {
-        messageId,
-        currentStatus: messageToProcess.print_status,
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("⚠️ 이미 처리된 메시지:", {
+          messageId,
+          currentStatus: messageToProcess.print_status,
+        });
+      }
       return;
     }
 
@@ -434,15 +496,19 @@ export default function HomePage() {
 
     try {
       const status = action === "approve" ? "completed" : "failed";
-      console.log(`🔄 메시지 처리 시작: ${messageId} (${action} → ${status})`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`🔄 메시지 처리 시작: ${messageId} (${action} → ${status})`);
+      }
 
       if (action === "approve") {
         // 프린터 연결 상태 확인
         if (printer.status !== "connected") {
-          console.log("❌ 프린터가 연결되지 않음 - 프린트 불가:", {
-            messageId,
-            printerStatus: printer.status,
-          });
+          if (process.env.NODE_ENV !== 'production') {
+            console.log("❌ 프린터가 연결되지 않음 - 프린트 불가:", {
+              messageId,
+              printerStatus: printer.status,
+            });
+          }
 
           toast({
             title: "프린터 연결 필요",
@@ -466,7 +532,9 @@ export default function HomePage() {
             senderName: messageToProcess.sender_profile.display_name,
           });
 
-          console.log("🖨️ 메시지 프린트 작업 완료:", messageId);
+          if (process.env.NODE_ENV !== 'production') {
+            console.log("🖨️ 메시지 프린트 작업 완료:", messageId);
+          }
 
           // 프린트 성공 후 UI에서 메시지 제거
           setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
