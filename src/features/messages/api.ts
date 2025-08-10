@@ -294,7 +294,9 @@ export async function getQueuedMessages(userId: string): Promise<
   }[]
 > {
   try {
-    console.log("🔍 대기 중인 메시지 조회 시작:", { userId });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("🔍 대기 중인 메시지 조회 시작:", { userId });
+    }
 
     // 먼저 RPC 함수 사용 시도
     const { data: rpcData, error: rpcError } = await supabase.rpc(
@@ -304,7 +306,9 @@ export async function getQueuedMessages(userId: string): Promise<
       }
     );
 
-    console.log("📊 RPC 응답:", { data: rpcData, error: rpcError });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("📊 RPC 응답:", { data: rpcData, error: rpcError });
+    }
 
     if (!rpcError) {
       return rpcData || [];
@@ -335,7 +339,9 @@ export async function getQueuedMessages(userId: string): Promise<
       .eq("print_status", "queued")
       .order("created_at", { ascending: true });
 
-    console.log("📊 직접 쿼리 응답:", { data: directData, error: directError });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("📊 직접 쿼리 응답:", { data: directData, error: directError });
+    }
 
     if (directError) {
       console.error("❌ 직접 쿼리도 실패:", directError);
@@ -385,7 +391,9 @@ export async function getQueuedMessages(userId: string): Promise<
     });
 
     // 안전하게 빈 배열 반환
-    console.warn("🔄 에러로 인해 빈 배열을 반환합니다.");
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn("🔄 에러로 인해 빈 배열을 반환합니다.");
+    }
     return [];
   }
 }
