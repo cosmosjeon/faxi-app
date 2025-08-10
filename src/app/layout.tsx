@@ -17,6 +17,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'FAXI - 감성 프린터 메신저',
   description: '디지털 메시지를 아날로그 감성으로 전달하는 특별한 메신저',
+  manifest: '/manifest.webmanifest',
 };
 
 export default function RootLayout({
