@@ -54,7 +54,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (session && session.user) {
-          console.log("✅ 세션 복원 성공:", session.user.id);
+          if (process.env.NODE_ENV !== 'production') {
+            console.log("✅ 세션 복원 성공:", session.user.id);
+          }
           setSession(session);
           setUser(session.user);
 
@@ -63,7 +65,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.warn("프로필 조회 실패 (세션은 유지):", profileError);
           });
         } else {
-          console.log("세션 없음, 초기 상태 설정");
+          if (process.env.NODE_ENV !== 'production') {
+            console.log("세션 없음, 초기 상태 설정");
+          }
           reset();
         }
       } catch (error) {
@@ -81,7 +85,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("🔄 Auth state changed:", event, session?.user?.id);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("🔄 Auth state changed:", event, session?.user?.id);
+      }
 
       // 주요 이벤트에만 반응하여 불필요한 처리 방지
       if (

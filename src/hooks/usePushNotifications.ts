@@ -14,6 +14,10 @@ interface PushNotificationState {
   isLoading: boolean;
 }
 
+const devLog = (...args: unknown[]) => {
+  if (process.env.NODE_ENV !== 'production') console.log(...args);
+};
+
 export function usePushNotifications() {
   const [state, setState] = useState<PushNotificationState>({
     permission: 'default',
@@ -54,7 +58,7 @@ export function usePushNotifications() {
 
   // 포그라운드 메시지 처리
   const handleForegroundMessage = (payload: any) => {
-    console.log('포그라운드 메시지 처리:', payload);
+    devLog('포그라운드 메시지 처리:', payload);
     
     // 메시지 타입별 처리
     switch (payload.type) {
@@ -175,7 +179,7 @@ export function usePushNotifications() {
       
       if (error) throw error;
       
-      console.log('✅ 푸시 토큰 저장 완료:', token.substring(0, 20) + '...');
+      devLog('✅ 푸시 토큰 저장 완료:', token.substring(0, 20) + '...');
     } catch (error) {
       console.error('❌ 푸시 토큰 저장 실패:', error);
       throw error;
@@ -183,7 +187,7 @@ export function usePushNotifications() {
   };
 
   // 디버깅용 로그 추가
-  console.log('usePushNotifications 상태:', {
+  devLog('usePushNotifications 상태:', {
     isSupported: state.isSupported,
     permission: state.permission,
     isLoading: state.isLoading,

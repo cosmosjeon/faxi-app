@@ -16,12 +16,31 @@ import type {
  * 사용자명으로 사용자 검색
  */
 export async function searchUserByUsername(
-  username: string
+  username: string,
+  viewerId: string
 ): Promise<SearchResult[]> {
   if (!username.trim()) return [];
 
   // 실제 Supabase API 호출
   try {
+    // 1) Privacy-aware RPC 우선 시도
+    const { data: rpcData, error: rpcError } = await supabase.rpc(
+      "search_users_with_privacy",
+      {
+        viewer_id: viewerId,
+        query: username,
+      }
+    );
+
+    if (!rpcError && Array.isArray(rpcData)) {
+      return rpcData.map((user: any) => ({
+        user,
+        friendship_status: "none" as const,
+        is_mutual: false,
+      }));
+    }
+
+    // 2) RPC 미배포 환경 폴백 (마이그레이션 전 호환)
     const { data: users, error } = await supabase
       .from("users")
       .select("*")

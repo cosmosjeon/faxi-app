@@ -42,6 +42,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase/client";
 import { useRealtimeDataSync } from "@/hooks/useRealtimeDataSync";
 import { FriendListSkeleton } from "@/components/ui/friend-skeleton";
+ 
 
 export default function FriendsPage() {
   const { profile } = useAuthStore();
@@ -58,6 +59,7 @@ export default function FriendsPage() {
   const [friendsCloseFriendStatus, setFriendsCloseFriendStatus] = useState<
     Record<string, boolean>
   >({});
+  
 
   // 친한친구 상태 구분 헬퍼 함수
   const getCloseFriendStatus = (friendId: string) => {
@@ -75,7 +77,7 @@ export default function FriendsPage() {
       (req) => req.requester_profile?.id === friendId
     );
 
-    console.log(`🔍 친구 상태 확인 [${friendId}]:`, {
+    if (process.env.NODE_ENV !== 'production') console.log(`🔍 친구 상태 확인 [${friendId}]:`, {
       isCloseFriend,
       hasSentRequest: !!sentRequest,
       hasReceivedRequest: !!receivedRequest,
@@ -86,25 +88,25 @@ export default function FriendsPage() {
     });
 
     if (isCloseFriend) {
-      console.log(`💖 [${friendId}] = 친한친구`);
+      if (process.env.NODE_ENV !== 'production') console.log(`💖 [${friendId}] = 친한친구`);
       return "close_friend"; // 💖 친한친구
     }
 
     if (sentRequest) {
-      console.log(`📤 [${friendId}] = 신청함`);
+      if (process.env.NODE_ENV !== 'production') console.log(`📤 [${friendId}] = 신청함`);
       return "sent_request"; // 📤 신청함
     }
 
     // ✅ 받은 친한친구 신청은 "받은 친한친구 신청들" 섹션에서만 표시
     // "내 친구들" 섹션에서는 일반친구로 처리하여 중복 방지
     if (receivedRequest) {
-      console.log(
+      if (process.env.NODE_ENV !== 'production') console.log(
         `📥 [${friendId}] = 신청받음 (별도 섹션에서 처리, 여기서는 일반친구로 표시)`
       );
       return "regular_friend"; // 💙 일반친구 (중복 방지)
     }
 
-    console.log(`💙 [${friendId}] = 일반친구`);
+    if (process.env.NODE_ENV !== 'production') console.log(`💙 [${friendId}] = 일반친구`);
     return "regular_friend"; // 💙 일반친구
   };
 
@@ -131,10 +133,12 @@ export default function FriendsPage() {
         (f) => f.status === "accepted"
       );
 
-      console.log(
-        "🔍 친한친구 상태 확인 시작, 친구 수:",
-        acceptedFriends.length
-      );
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(
+          "🔍 친한친구 상태 확인 시작, 친구 수:",
+          acceptedFriends.length
+        );
+      }
 
       for (const friend of acceptedFriends) {
         const isCloseFriend = await areCloseFriends(
@@ -142,11 +146,13 @@ export default function FriendsPage() {
           friend.friend_id
         );
         closeFriendStatusMap[friend.friend_id] = isCloseFriend;
-        console.log(
-          `👥 ${friend.friend_profile.display_name}: ${
-            isCloseFriend ? "💖 친한친구" : "💙 일반친구"
-          }`
-        );
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(
+            `👥 ${friend.friend_profile.display_name}: ${
+              isCloseFriend ? "💖 친한친구" : "💙 일반친구"
+            }`
+          );
+        }
 
         // 디버깅: 친한친구가 아닌데 왜 그런지 상세 분석 (개발 환경에서만)
         if (!isCloseFriend && process.env.NODE_ENV === "development") {
@@ -158,7 +164,7 @@ export default function FriendsPage() {
       }
 
       setFriendsCloseFriendStatus(closeFriendStatusMap);
-      console.log("✅ 친한친구 상태 맵 업데이트 완료:", closeFriendStatusMap);
+      if (process.env.NODE_ENV !== 'production') console.log("✅ 친한친구 상태 맵 업데이트 완료:", closeFriendStatusMap);
     } catch (error) {
       console.error("친구 목록 로드 실패:", error);
       toast({
@@ -179,7 +185,7 @@ export default function FriendsPage() {
   useEffect(() => {
     if (!profile) return;
 
-    console.log("🔄 친구 상태 실시간 구독 시작");
+    if (process.env.NODE_ENV !== 'production') console.log("🔄 친구 상태 실시간 구독 시작");
 
     // friendships 테이블 변경 사항 구독
     const friendshipsSubscription = supabase
@@ -193,7 +199,7 @@ export default function FriendsPage() {
           filter: `friend_id=eq.${profile.id}`, // 내가 받은 요청들
         },
         (payload) => {
-          console.log("📢 친구 요청 상태 변경:", payload);
+          if (process.env.NODE_ENV !== 'production') console.log("📢 친구 요청 상태 변경:", payload);
           // 친구 목록 다시 로드
           loadFriends();
         }
@@ -207,7 +213,7 @@ export default function FriendsPage() {
           filter: `user_id=eq.${profile.id}`, // 내가 보낸 요청들
         },
         (payload) => {
-          console.log("📢 내 친구 요청 상태 변경:", payload);
+          if (process.env.NODE_ENV !== 'production') console.log("📢 내 친구 요청 상태 변경:", payload);
           // 친구 목록 다시 로드
           loadFriends();
         }
@@ -215,7 +221,7 @@ export default function FriendsPage() {
       .subscribe();
 
     return () => {
-      console.log("🔄 친구 상태 실시간 구독 해제");
+      if (process.env.NODE_ENV !== 'production') console.log("🔄 친구 상태 실시간 구독 해제");
       friendshipsSubscription.unsubscribe();
     };
   }, [profile]);
@@ -226,18 +232,18 @@ export default function FriendsPage() {
 
     // 중복 클릭 방지
     if (updatingFriendIds.has(friendId)) {
-      console.log("⚠️ 이미 처리 중인 요청입니다.");
+      if (process.env.NODE_ENV !== 'production') console.log("⚠️ 이미 처리 중인 요청입니다.");
       return;
     }
 
     setUpdatingFriendIds((prev) => new Set(prev).add(friendId));
 
     try {
-      console.log(`🔄 친한친구 신청 시작: ${profile.id} → ${friendId}`);
+      if (process.env.NODE_ENV !== 'production') console.log(`🔄 친한친구 신청 시작: ${profile.id} → ${friendId}`);
 
       // 신청 전 마지막 상태 확인
       const preCheckResult = await debugCloseFriendStatus(profile.id, friendId);
-      console.log("📋 신청 전 상태:", preCheckResult.summary);
+      if (process.env.NODE_ENV !== 'production') console.log("📋 신청 전 상태:", preCheckResult.summary);
 
       if (preCheckResult.areCloseFriendsResult) {
         toast({
@@ -286,7 +292,7 @@ export default function FriendsPage() {
   // 친한친구 신청 수락
   const handleAcceptCloseFriendRequest = async (requestId: string) => {
     try {
-      console.log("🔄 친한친구 신청 수락 시작:", requestId);
+      if (process.env.NODE_ENV !== 'production') console.log("🔄 친한친구 신청 수락 시작:", requestId);
 
       // 1. 먼저 해당 요청의 정보 찾기
       const request = closeFriendRequests.find((req) => req.id === requestId);
@@ -296,16 +302,16 @@ export default function FriendsPage() {
       }
 
       const friendId = request.requester_profile?.id;
-      console.log("👤 친한친구가 될 사용자:", friendId);
+      if (process.env.NODE_ENV !== 'production') console.log("👤 친한친구가 될 사용자:", friendId);
 
       // 2. 친구 관계 상태 미리 확인
       if (profile && friendId) {
-        console.log("🔍 친구 관계 상태 미리 확인...");
+        if (process.env.NODE_ENV !== 'production') console.log("🔍 친구 관계 상태 미리 확인...");
         const friendshipStatus = await checkFriendshipStatus(
           profile.id,
           friendId
         );
-        console.log("📊 친구 관계 확인 결과:", friendshipStatus);
+        if (process.env.NODE_ENV !== 'production') console.log("📊 친구 관계 확인 결과:", friendshipStatus);
       }
 
       // 3. API 호출
@@ -317,18 +323,18 @@ export default function FriendsPage() {
           ...prev,
           [friendId]: true,
         }));
-        console.log("✅ 로컬 친한친구 상태 업데이트됨:", friendId);
+        if (process.env.NODE_ENV !== 'production') console.log("✅ 로컬 친한친구 상태 업데이트됨:", friendId);
       }
 
       // 4. 1초 대기 후 전체 데이터 새로고침 (DB 동기화 시간 확보)
-      console.log("⏳ 1초 대기 후 데이터 새로고침...");
+      if (process.env.NODE_ENV !== 'production') console.log("⏳ 1초 대기 후 데이터 새로고침...");
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       await loadFriends();
 
       // 5. 수락 후 상태 재확인 (디버깅)
       if (friendId && profile) {
-        console.log("🔍 수락 후 상태 재확인...");
+        if (process.env.NODE_ENV !== 'production') console.log("🔍 수락 후 상태 재확인...");
         const recheckResult = await debugCloseFriendStatus(
           profile.id,
           friendId
@@ -349,7 +355,7 @@ export default function FriendsPage() {
         description: "친한친구가 되었습니다!",
       });
 
-      console.log("🎉 친한친구 신청 수락 완료");
+      if (process.env.NODE_ENV !== 'production') console.log("🎉 친한친구 신청 수락 완료");
     } catch (error) {
       console.error("친한친구 신청 수락 실패:", error);
       toast({
@@ -532,10 +538,13 @@ export default function FriendsPage() {
     }
   };
 
+  
+
   // 노션 스타일 친한친구 카드 컴포넌트
   const CloseFriendCard = ({ friend }: { friend: FriendWithProfile }) => {
     const status = getCloseFriendStatus(friend.friend_id);
     const isUpdating = updatingFriendIds.has(friend.friend_id);
+    
 
     const getStatusConfig = () => {
       switch (status) {
@@ -641,7 +650,7 @@ export default function FriendsPage() {
         className={`flex items-center justify-between p-3 rounded-lg border ${config.borderColor} ${config.bgColor} hover:shadow-sm transition-shadow duration-200`}
       >
         <div className="flex items-center gap-3">
-          <Avatar className="h-12 w-12">
+            <Avatar className="h-12 w-12">
             <AvatarImage
               src={friend.friend_profile?.avatar_url || ""}
               alt={friend.friend_profile?.display_name || ""}
@@ -655,9 +664,7 @@ export default function FriendsPage() {
             <h3 className="font-medium text-gray-900">
               {friend.friend_profile.display_name}
             </h3>
-            <p className="text-sm text-gray-600">
-              @{friend.friend_profile.username}
-            </p>
+            <p className="text-sm text-gray-600">@{friend.friend_profile.username}</p>
             {config.statusText && (
               <div className="flex items-center gap-1 mt-1">
                 {config.icon}
