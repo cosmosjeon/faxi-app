@@ -2,6 +2,11 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging';
 
+// 개발 환경에서만 로그 출력
+const devLog = (...args: unknown[]) => {
+  if (process.env.NODE_ENV !== 'production') console.log(...args);
+};
+
 // Firebase 설정 검증
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -17,7 +22,7 @@ function validateFirebaseConfig() {
   const required = ['apiKey', 'authDomain', 'projectId', 'messagingSenderId', 'appId'];
   const missing = required.filter(key => !firebaseConfig[key]);
   
-  console.log('Firebase 설정 검증:', {
+  devLog('Firebase 설정 검증:', {
     apiKey: firebaseConfig.apiKey ? `${firebaseConfig.apiKey.substring(0, 10)}...` : '없음',
     authDomain: firebaseConfig.authDomain || '없음',
     projectId: firebaseConfig.projectId || '없음',
@@ -29,7 +34,7 @@ function validateFirebaseConfig() {
     console.error('❌ Firebase 설정 누락:', missing);
     return false;
   }
-  console.log('✅ Firebase 설정 검증 완료');
+  devLog('✅ Firebase 설정 검증 완료');
   return true;
 }
 
@@ -38,7 +43,7 @@ let app = null;
 try {
   if (validateFirebaseConfig()) {
     app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-    console.log('✅ Firebase 앱 초기화 완료:', app.name);
+    devLog('✅ Firebase 앱 초기화 완료:', (app as any).name);
   } else {
     console.error('❌ Firebase 설정이 유효하지 않음');
   }
@@ -62,7 +67,7 @@ export const getFirebaseMessaging = async () => {
 // FCM 토큰 발급 (디버깅 강화 버전)
 export const getFCMToken = async (): Promise<string | null> => {
   try {
-    console.log('Firebase 설정 확인:', {
+    devLog('Firebase 설정 확인:', {
       apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? '설정됨' : '없음',
       authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
       projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
@@ -75,14 +80,14 @@ export const getFCMToken = async (): Promise<string | null> => {
       return null;
     }
     
-    console.log('Firebase Messaging 초기화 성공, 토큰 발급 시도...');
+    devLog('Firebase Messaging 초기화 성공, 토큰 발급 시도...');
     
     const token = await getToken(messaging, {
       vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY
     });
     
     if (token) {
-      console.log('✅ FCM 토큰 발급 성공:', token.substring(0, 20) + '...');
+      devLog('✅ FCM 토큰 발급 성공:', token.substring(0, 20) + '...');
       return token;
     } else {
       console.error('❌ FCM 토큰 발급 실패: 토큰이 null');
@@ -91,7 +96,7 @@ export const getFCMToken = async (): Promise<string | null> => {
   } catch (error) {
     console.error('❌ FCM 토큰 발급 중 오류:', error);
     const err = error as { name?: unknown; message?: unknown; code?: unknown };
-    console.error('에러 상세:', {
+    devLog('에러 상세:', {
       name: typeof err.name === 'string' ? err.name : 'unknown',
       message: typeof err.message === 'string' ? err.message : 'unknown',
       code: typeof err.code === 'string' ? err.code : 'unknown'
@@ -115,7 +120,7 @@ export const setupForegroundMessaging = (
   getFirebaseMessaging().then(messaging => {
     if (messaging) {
       onMessage(messaging, (payload) => {
-        console.log('포그라운드 메시지 수신:', payload);
+        devLog('포그라운드 메시지 수신:', payload);
         
         // 메시지 타입별 처리
         const { notification, data } = payload;
@@ -142,18 +147,9 @@ export const registerServiceWorker = async (): Promise<boolean> => {
   }
 
   try {
-    // 먼저 간단한 테스트 Service Worker 등록
-    console.log('Service Worker 등록 시도...');
-    const registration = await navigator.serviceWorker.register(
-      '/test-sw.js',
-      { scope: '/' }
-    );
-    
-    console.log('✅ 테스트 Service Worker 등록 성공:', registration);
-    
-    // 테스트 성공 후 실제 Firebase Service Worker 등록
+    devLog('Service Worker 등록 시도...');
     await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-    console.log('✅ Firebase Service Worker 등록 성공');
+    devLog('✅ Firebase Service Worker 등록 성공');
     return true;
   } catch (error) {
     console.error('❌ Service Worker 등록 실패:', error);

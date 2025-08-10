@@ -38,15 +38,16 @@ export default function PrivacySettingsPage() {
 
     const loadSettings = async () => {
       try {
-        console.log("🔄 개인정보 설정 로드 시작:", profile.id);
 
         const userSettings = await getUserSettings(profile.id);
 
-        console.log("📋 가져온 사용자 설정:", {
-          raw: userSettings,
-          hasProfileVisibility: "profile_visibility" in (userSettings || {}),
-          hasOnlineStatus: "show_online_status" in (userSettings || {}),
-        });
+        if (process.env.NODE_ENV !== 'production') {
+          console.log("📋 가져온 사용자 설정:", {
+            raw: userSettings,
+            hasProfileVisibility: "profile_visibility" in (userSettings || {}),
+            hasOnlineStatus: "show_online_status" in (userSettings || {}),
+          });
+        }
 
         if (userSettings) {
           // MVP 개인정보 설정만 추출
@@ -55,10 +56,14 @@ export default function PrivacySettingsPage() {
             show_online_status: userSettings.show_online_status ?? true,
           };
 
-          console.log("✅ 로드된 개인정보 설정:", privacySettings);
+          if (process.env.NODE_ENV !== 'production') {
+            console.log("✅ 로드된 개인정보 설정:", privacySettings);
+          }
           setSettings(privacySettings);
         } else {
-          console.warn("⚠️ 사용자 설정이 없음, 기본값 사용");
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn("⚠️ 사용자 설정이 없음, 기본값 사용");
+          }
 
           // 기본값 설정
           const defaultSettings: PrivacySettings = {
@@ -97,19 +102,23 @@ export default function PrivacySettingsPage() {
     value: boolean | string
   ) => {
     if (!profile?.id || !settings) {
-      console.warn("⚠️ 필수 데이터 누락:", {
-        profileId: profile?.id,
-        settings: !!settings,
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn("⚠️ 필수 데이터 누락:", {
+          profileId: profile?.id,
+          settings: !!settings,
+        });
+      }
       return;
     }
 
-    console.log("🔄 개인정보 설정 변경 시작:", {
-      key,
-      value,
-      userId: profile.id,
-      originalValue: settings[key],
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("🔄 개인정보 설정 변경 시작:", {
+        key,
+        value,
+        userId: profile.id,
+        originalValue: settings[key],
+      });
+    }
 
     // 클라이언트 사이드 검증
     if (key === "profile_visibility" && typeof value !== "string") {
@@ -144,7 +153,9 @@ export default function PrivacySettingsPage() {
 
     // 값 변경이 없으면 스킵
     if (settings[key] === value) {
-      console.log("⏭️ 동일한 값으로 변경 시도, 스킵");
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("⏭️ 동일한 값으로 변경 시도, 스킵");
+      }
       return;
     }
 
@@ -163,7 +174,9 @@ export default function PrivacySettingsPage() {
         settings: { [key]: value } as Partial<PrivacySettings>,
       };
 
-      console.log("📤 서버 업데이트 요청:", updateRequest);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("📤 서버 업데이트 요청:", updateRequest);
+      }
 
       // 네트워크 연결 상태 확인 (가능한 경우)
       if (
@@ -176,14 +189,18 @@ export default function PrivacySettingsPage() {
 
       const result = await updatePrivacySettings(updateRequest);
 
-      console.log("📥 서버 응답:", result);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("📥 서버 응답:", result);
+      }
 
       if (!result.success) {
         throw new Error(result.error || "알 수 없는 오류가 발생했습니다.");
       }
 
       // 성공 시 최신 설정을 다시 불러와서 동기화 보장
-      console.log("✅ 업데이트 성공, 최신 설정 재로드");
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("✅ 업데이트 성공, 최신 설정 재로드");
+      }
 
       const refreshedSettings = await getUserSettings(profile.id);
       if (refreshedSettings) {
@@ -193,7 +210,9 @@ export default function PrivacySettingsPage() {
         };
 
         setSettings(syncedSettings);
-        console.log("🔄 설정 동기화 완료:", syncedSettings);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log("🔄 설정 동기화 완료:", syncedSettings);
+        }
       }
 
       toast({
@@ -214,7 +233,9 @@ export default function PrivacySettingsPage() {
 
       // 실패 시 원래 설정으로 롤백
       setSettings(originalSettings);
-      console.log("🔄 설정 롤백 완료:", originalSettings);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("🔄 설정 롤백 완료:", originalSettings);
+      }
 
       // 사용자 친화적 에러 메시지 생성
       let userFriendlyMessage = "설정을 저장하는데 실패했습니다.";
@@ -375,12 +396,13 @@ export default function PrivacySettingsPage() {
             </div>
 
             {/* 개발 정보 (개발 중에만 표시) */}
-            <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-              <p className="text-xs text-green-800">
-                <strong>✅ MVP 완료:</strong> 개인정보 설정이 데이터베이스와
-                연결되었습니다. 불필요한 설정들은 제거되어 더 간단해졌습니다.
-              </p>
-            </div>
+            {process.env.NODE_ENV !== 'production' && (
+              <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                <p className="text-xs text-green-800">
+                  <strong>✅ 개발 안내:</strong> 설정 변경은 DB에 저장되며 새로고침 후에도 유지됩니다.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

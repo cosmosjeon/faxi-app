@@ -13,24 +13,19 @@ export function PushNotificationInitializer() {
         'Notification' in window && 
         'serviceWorker' in navigator;
       
-      if (!isSupported) {
-        console.log('푸시 알림 미지원 브라우저');
-        return;
-      }
+      if (!isSupported) return;
 
       try {
         // Service Worker 등록
         const registered = await registerServiceWorker();
         
         if (registered) {
-          console.log('✅ FAXI Service Worker 등록 완료');
-          
           // 포그라운드 메시지 리스너 설정
           setupForegroundMessaging((payload) => {
             handleForegroundMessage(payload);
           });
         } else {
-          console.log('❌ Service Worker 등록 실패');
+          // no-op
         }
       } catch (error) {
         console.error('푸시 알림 초기화 오류:', error);
@@ -42,7 +37,9 @@ export function PushNotificationInitializer() {
 
   // 포그라운드 메시지 처리
   const handleForegroundMessage = (payload: any) => {
-    console.log('포그라운드 메시지 수신:', payload);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('포그라운드 메시지 수신:', payload);
+    }
     
     // 메시지 타입별 처리
     switch (payload.type) {

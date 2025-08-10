@@ -24,7 +24,9 @@ export default function PhotoPreviewPage() {
     if (savedEditData) {
       try {
         const data = JSON.parse(savedEditData);
-        console.log("편집 데이터 로드:", data);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log("편집 데이터 로드:", data);
+        }
 
         // 필수 데이터 검증
         if (!data.imageBase64) {
@@ -41,7 +43,9 @@ export default function PhotoPreviewPage() {
       }
     } else {
       // 편집 데이터가 없으면 편집 페이지로 돌아가기
-      console.log("저장된 편집 데이터가 없습니다");
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("저장된 편집 데이터가 없습니다");
+      }
       router.push("/printer/photo-edit");
     }
   }, [router]);
@@ -141,15 +145,19 @@ export default function PhotoPreviewPage() {
 
       img.onerror = (error) => {
         console.error("이미지 로드 실패:", error);
-        console.error("이미지 URL 길이:", data.imageBase64?.length);
-        console.error("이미지 URL 시작:", data.imageBase64?.substring(0, 50));
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("이미지 URL 길이:", data.imageBase64?.length);
+          console.error("이미지 URL 시작:", data.imageBase64?.substring(0, 50));
+        }
         setIsGenerating(false);
       };
 
-      console.log(
-        "이미지 로드 시작:",
-        data.imageBase64?.substring(0, 50) + "..."
-      );
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(
+          "이미지 로드 시작:",
+          data.imageBase64?.substring(0, 50) + "..."
+        );
+      }
       img.src = data.imageBase64;
     } catch (error) {
       console.error("미리보기 생성 실패:", error);
