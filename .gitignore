@@ -43,9 +43,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# --- security: generated public configs (should not be committed) ---
-# If you generate Firebase SW config from env, keep the generated file untracked
-public/firebase-config.js
+
 
 # If you later switch to generating the SW file itself, ignore it too (currently tracked)
 # public/firebase-messaging-sw.js
