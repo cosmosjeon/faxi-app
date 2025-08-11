@@ -61,3 +61,12 @@ serviceAccount*.json
 *.keystore
 *.jks
 *.der
+
+# faxi-twa ignores
+/faxi-twa/.gradle/
+/faxi-twa/build/
+/faxi-twa/app/build/
+/faxi-twa/*.apk
+/faxi-twa/*.aab
+/faxi-twa/*.idsig
+/faxi-twa/android.keystore
