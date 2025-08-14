@@ -59,23 +59,38 @@ const outFile = path.join(outDir, 'firebase-config.js');
 
 fs.mkdirSync(outDir, { recursive: true });
 
-const banner = '/* This file is generated from environment variables. Do not commit. */\n';
-const content = banner + 'self.FAXI_FIREBASE_CONFIG = ' + JSON.stringify(config, null, 2) + ';\n';
+// 개발 환경에서만 firebase-config.js 생성 (보안 강화)
+const isProduction = process.env.NODE_ENV === 'production';
+const shouldGenerateConfig = !isProduction || process.env.GENERATE_SW_CONFIG === 'true';
 
-try {
-  fs.writeFileSync(outFile, content, 'utf8');
-} catch (err) {
-  console.error('[generate-sw-config] Failed to write', outFile, err);
-  process.exit(0);
+if (shouldGenerateConfig) {
+  const banner = '/* This file is generated from environment variables. Do not commit. */\n';
+  const content = banner + 'self.FAXI_FIREBASE_CONFIG = ' + JSON.stringify(config, null, 2) + ';\n';
+
+  try {
+    fs.writeFileSync(outFile, content, 'utf8');
+    console.log('[generate-sw-config] Generated public/firebase-config.js (apiKey: ' + (config.apiKey ? config.apiKey.slice(0, 6) + '...' : 'unset') + ')');
+  } catch (err) {
+    console.error('[generate-sw-config] Failed to write', outFile, err);
+    process.exit(0);
+  }
+} else {
+  console.log('[generate-sw-config] Skipped firebase-config.js generation in production mode');
+  
+  // 프로덕션에서는 파일이 있다면 삭제
+  try {
+    if (fs.existsSync(outFile)) {
+      fs.unlinkSync(outFile);
+      console.log('[generate-sw-config] Removed firebase-config.js for production');
+    }
+  } catch (err) {
+    console.warn('[generate-sw-config] Could not remove firebase-config.js:', err.message);
+  }
 }
 
 const missing = requiredEnvKeys.filter((k) => !env[k]);
 if (missing.length > 0) {
   console.warn('[generate-sw-config] Missing env keys:', missing.join(', '));
-} else {
-  const key = config.apiKey;
-  const preview = key ? key.slice(0, 6) + '...' : 'unset';
-  console.log('[generate-sw-config] Generated public/firebase-config.js (apiKey: ' + preview + ')');
 }
 
 process.exit(0);

@@ -8,31 +8,80 @@ import { toast } from '@/hooks/use-toast';
 export function PushNotificationInitializer() {
   useEffect(() => {
     const initializePushSystem = async () => {
+      console.log('[PushInit] 푸시 알림 시스템 초기화 시작');
+      
+      // TWA 환경 감지
+      const isTWA = () => {
+        if (typeof window === 'undefined') return false;
+        const userAgent = navigator.userAgent;
+        const isWebView = /wv/.test(userAgent);
+        const isAndroid = /Android/.test(userAgent);
+        const hasTWAPackage = /com\.cosmosjeon\.faxi/.test(userAgent);
+        return isAndroid && (isWebView || hasTWAPackage);
+      };
+
+      const twaEnv = isTWA();
+      console.log('[PushInit] 환경:', twaEnv ? 'TWA' : '웹브라우저');
+
       // 브라우저 지원 여부 확인
       const isSupported = 
         'Notification' in window && 
         'serviceWorker' in navigator;
       
-      if (!isSupported) return;
+      if (!isSupported) {
+        console.warn('[PushInit] 푸시 알림 미지원 환경');
+        return;
+      }
 
       try {
+        // TWA 환경에서는 DOM 완전 로딩 대기
+        if (twaEnv) {
+          console.log('[PushInit] TWA 환경: DOM 로딩 대기');
+          await new Promise(resolve => {
+            if (document.readyState === 'complete') {
+              resolve(undefined);
+            } else {
+              window.addEventListener('load', () => resolve(undefined));
+            }
+          });
+          
+          // TWA 환경에서 추가 대기시간
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        console.log('[PushInit] Service Worker 등록 시작');
         // Service Worker 등록
         const registered = await registerServiceWorker();
         
         if (registered) {
-          // 포그라운드 메시지 리스너 설정
-          setupForegroundMessaging((payload) => {
-            handleForegroundMessage(payload);
-          });
+          console.log('[PushInit] Service Worker 등록 성공, 포그라운드 리스너 설정');
+          
+          // TWA 환경에서는 약간의 지연 후 포그라운드 메시지 설정
+          if (twaEnv) {
+            setTimeout(() => {
+              setupForegroundMessaging((payload) => {
+                handleForegroundMessage(payload);
+              });
+            }, 1500);
+          } else {
+            setupForegroundMessaging((payload) => {
+              handleForegroundMessage(payload);
+            });
+          }
         } else {
-          // no-op
+          console.warn('[PushInit] Service Worker 등록 실패');
         }
       } catch (error) {
-        console.error('푸시 알림 초기화 오류:', error);
+        console.error('[PushInit] 푸시 알림 초기화 오류:', error);
       }
     };
 
-    initializePushSystem();
+    // TWA 환경에서는 약간의 지연 후 초기화
+    const initDelay = typeof window !== 'undefined' && 
+                     /Android/.test(navigator.userAgent) && 
+                     /wv/.test(navigator.userAgent) ? 500 : 0;
+
+    setTimeout(initializePushSystem, initDelay);
   }, []);
 
   // 포그라운드 메시지 처리
