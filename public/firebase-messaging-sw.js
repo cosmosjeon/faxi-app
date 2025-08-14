@@ -1,22 +1,50 @@
 // Firebase 푸시 알림용 Service Worker
-// Next.js PWA 호환 버전
+// TWA 환경 지원 버전
 
 try {
+  console.log('[SW] Service Worker 초기화 시작');
+  
   // Firebase SDK 임포트 (안정적인 v10 버전 사용)
   importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js');
   importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js');
-  importScripts('/firebase-config.js');
-
-  // Firebase 설정 (외부 구성 로드)
-  const firebaseConfig = (typeof self !== 'undefined' && self.FAXI_FIREBASE_CONFIG)
-    ? self.FAXI_FIREBASE_CONFIG
-    : null;
+  
+  // TWA 환경 감지
+  const isTWAEnvironment = () => {
+    return self.location.hostname === 'faxi-app.vercel.app';
+  };
+  
+  // Firebase 설정을 메인 앱에서 동적으로 받아오기
+  let firebaseConfig = null;
+  
+  // Service Worker 메시지로 Firebase 설정 받기
+  self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'FIREBASE_CONFIG') {
+      firebaseConfig = event.data.config;
+      console.log('[SW] Firebase 설정 수신 완료');
+      
+      // Firebase 초기화
+      if (firebaseConfig && !firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+        console.log('[SW] Firebase 앱 초기화 완료 (동적)');
+      }
+    }
+  });
+  
+  // 임시로 firebase-config.js 시도 (기존 호환성)
+  try {
+    importScripts('/firebase-config.js');
+    firebaseConfig = self.FAXI_FIREBASE_CONFIG;
+    console.log('[SW] Firebase 설정 로드 성공 (fallback)');
+  } catch (configError) {
+    console.log('[SW] firebase-config.js 없음, 동적 로딩 대기중...');
+  }
 
   // Firebase 초기화
   if (firebaseConfig && !firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
+    console.log('[SW] Firebase 앱 초기화 완료:', firebase.apps.length);
   } else if (!firebaseConfig) {
-    console.error('Firebase 설정을 불러오지 못했습니다. /firebase-config.js 확인');
+    console.error('[SW] Firebase 설정이 없습니다.');
   }
   
   const messaging = firebase.apps.length ? firebase.messaging() : null;
@@ -161,14 +189,24 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
+// Service Worker 메시지 처리 (TWA 지원)
+self.addEventListener('message', (event) => {
+  console.log('[SW] 메시지 수신:', event.data);
+  
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    console.log('[SW] SKIP_WAITING 실행');
+    self.skipWaiting();
+  }
+});
+
 // Service Worker 생명주기
 self.addEventListener('install', (event) => {
-  console.log('FAXI Service Worker 설치됨');
+  console.log('[SW] FAXI Service Worker 설치됨');
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('FAXI Service Worker 활성화됨');
+  console.log('[SW] FAXI Service Worker 활성화됨');
   event.waitUntil(self.clients.claim());
 });
 
