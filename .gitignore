@@ -62,6 +62,9 @@ serviceAccount*.json
 *.jks
 *.der
 
+# Firebase config (contains API keys)
+public/firebase-config.js
+
 # faxi-twa ignores
 /faxi-twa/.gradle/
 /faxi-twa/build/
