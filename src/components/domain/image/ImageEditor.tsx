@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { RotateCw, Type, Eye } from "lucide-react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -415,10 +416,12 @@ export function ImageEditor({
         className="relative border rounded-lg overflow-hidden bg-gray-100"
       >
         {imageUrl && (
-          <img
+          <Image
             ref={imageRef}
             src={imageUrl}
             alt="편집할 이미지"
+            width={400}
+            height={256}
             className="w-full h-auto max-h-64 object-contain"
             style={{
               transform: `rotate(${editState.rotation}deg)`,
@@ -470,9 +473,11 @@ export function ImageEditor({
           </Label>
           <div className="flex justify-center">
             <div className="border border-gray-300 p-2 rounded bg-gray-50">
-              <img
+              <Image
                 src={previewUrl}
                 alt="출력 미리보기"
+                width={300}
+                height={200}
                 className="max-w-full h-auto"
               />
             </div>

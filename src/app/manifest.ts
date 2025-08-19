@@ -17,7 +17,7 @@ export default function manifest(): MetadataRoute.Manifest {
     icons: [
       {
         src: "/icons/faxi-badge.png",
-        sizes: "256x256",
+        sizes: "72x72",
         type: "image/png",
         purpose: "any",
       },

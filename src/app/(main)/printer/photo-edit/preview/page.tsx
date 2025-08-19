@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Printer, Download } from "lucide-react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useBlePrinter } from "@/hooks/useBlePrinter";
@@ -61,7 +62,7 @@ export default function PhotoPreviewPage() {
       if (!ctx) throw new Error("Canvas context not available");
 
       // 이미지 로드
-      const img = new Image();
+      const img = new window.Image();
       img.onload = () => {
         // 프린터 출력 크기 설정 (300dpi 기준, 58mm 폭)
         const printWidth = 384;
@@ -254,9 +255,11 @@ export default function PhotoPreviewPage() {
                 {/* 미리보기 이미지 */}
                 <div className="flex justify-center">
                   <div className="border-2 border-dashed border-gray-300 p-4 rounded-lg bg-white">
-                    <img
+                    <Image
                       src={previewImageUrl}
                       alt="프린트 미리보기"
+                      width={400}
+                      height={400}
                       className="max-w-full h-auto"
                       style={{ maxHeight: "400px" }}
                     />
@@ -273,7 +276,7 @@ export default function PhotoPreviewPage() {
                 {editData && (
                   <div className="text-xs text-gray-500 space-y-1">
                     <p>• 회전: {editData.rotation}°</p>
-                    {editData.text && <p>• 문구: "{editData.text}"</p>}
+                    {editData.text && <p>• 문구: &quot;{editData.text}&quot;</p>}
                   </div>
                 )}
               </div>

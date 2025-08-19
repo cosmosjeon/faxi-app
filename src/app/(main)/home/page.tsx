@@ -979,7 +979,7 @@ export default function HomePage() {
 
                 {confirmDialog.message.lcd_teaser && (
                   <div className="bg-gray-900 text-green-400 font-mono text-sm p-2 rounded text-center">
-                    "{confirmDialog.message.lcd_teaser}"
+                    &quot;{confirmDialog.message.lcd_teaser}&quot;
                   </div>
                 )}
 

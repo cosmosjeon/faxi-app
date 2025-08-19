@@ -1020,7 +1020,7 @@ export default function FriendsPage() {
                 <div className="text-4xl mb-4">🔍</div>
                 <p className="text-gray-600 mb-2">검색 결과가 없습니다</p>
                 <p className="text-sm text-gray-500">
-                  "{searchQuery}"와 일치하는 친구가 없습니다
+                  &quot;{searchQuery}&quot;와 일치하는 친구가 없습니다
                 </p>
               </CardContent>
             </Card>

@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Image, Send, Users, X, ArrowLeft, Check } from "lucide-react";
+import { Image as ImageIcon, Send, Users, X, ArrowLeft, Check } from "lucide-react";
+import Image from "next/image";
 import {
   Card,
   CardContent,
@@ -551,7 +552,7 @@ export default function ComposePage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Image size={20} />
+                  <ImageIcon size={20} />
                   이미지 첨부 (선택)
                 </CardTitle>
                 {errors.image_file && (
@@ -561,9 +562,11 @@ export default function ComposePage() {
               <CardContent>
                 {imagePreview ? (
                   <div className="relative">
-                    <img
+                    <Image
                       src={imagePreview}
                       alt="이미지 미리보기"
+                      width={400}
+                      height={192}
                       className="w-full rounded-lg max-h-48 object-cover"
                     />
                     <Button
@@ -587,7 +590,7 @@ export default function ComposePage() {
                     className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-gray-400 transition-colors"
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    <Image size={48} className="mx-auto text-gray-400 mb-4" />
+                    <ImageIcon size={48} className="mx-auto text-gray-400 mb-4" />
                     <p className="text-gray-500">이미지를 선택하세요</p>
                     <p className="text-xs text-gray-400 mt-1">
                       JPG, PNG 최대 5MB
