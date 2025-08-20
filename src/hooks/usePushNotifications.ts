@@ -95,12 +95,26 @@ export function usePushNotifications() {
     }
   };
 
-  // 푸시 알림 설정 (권한 요청 + 토큰 발급 + 저장)
+  // TWA 환경 감지
+  const isTWA = () => {
+    if (typeof window === 'undefined') return false;
+    const userAgent = navigator.userAgent;
+    const isWebView = /wv/.test(userAgent);
+    const isAndroid = /Android/.test(userAgent);
+    const hasTWAPackage = /com\.cosmosjeon\.faxi/.test(userAgent);
+    return isAndroid && (isWebView || hasTWAPackage);
+  };
+
+  // 푸시 알림 설정 (권한 요청 + 토큰 발급 + 저장) - TWA 환경 강화
   const setupPushNotifications = async (): Promise<boolean> => {
     if (!state.isSupported) {
+      const errorMsg = isTWA() ? 
+        'APK 환경에서 푸시 알림을 초기화할 수 없습니다. 다시 시도해주세요.' :
+        '이 브라우저는 푸시 알림을 지원하지 않습니다.';
+      
       toast({
         title: '푸시 알림 미지원',
-        description: '이 브라우저는 푸시 알림을 지원하지 않습니다.',
+        description: errorMsg,
         variant: 'destructive'
       });
       return false;
@@ -109,27 +123,70 @@ export function usePushNotifications() {
     setState(prev => ({ ...prev, isLoading: true }));
 
     try {
+      // TWA 환경에서는 추가 대기 시간
+      if (isTWA()) {
+        devLog('TWA 환경 감지, 초기화 대기 중...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
       // 1. 알림 권한 요청
+      devLog('1단계: 알림 권한 요청');
       const hasPermission = await requestNotificationPermission();
       if (!hasPermission) {
+        const permissionError = isTWA() ? 
+          'APK에서 알림 권한을 허용해주세요. 설정 > 앱 > FAXI > 알림에서 확인할 수 있습니다.' :
+          '푸시 알림을 받으려면 알림 권한을 허용해주세요.';
+        
         toast({
           title: '권한이 필요합니다',
-          description: '푸시 알림을 받으려면 알림 권한을 허용해주세요.',
+          description: permissionError,
           variant: 'destructive'
         });
         setState(prev => ({ ...prev, permission: 'denied', isLoading: false }));
         return false;
       }
 
-      // 2. FCM 토큰 발급
-      const token = await getFCMToken();
-      if (!token) {
-        throw new Error('FCM 토큰 발급 실패');
+      devLog('2단계: FCM 토큰 발급 시작');
+      
+      // 2. FCM 토큰 발급 (TWA 환경에서는 재시도)
+      let token = null;
+      let retryCount = 0;
+      const maxRetries = isTWA() ? 3 : 1;
+
+      while (!token && retryCount < maxRetries) {
+        try {
+          devLog(`FCM 토큰 발급 시도 ${retryCount + 1}/${maxRetries}`);
+          token = await getFCMToken();
+          
+          if (!token && retryCount < maxRetries - 1) {
+            devLog(`토큰 발급 실패, ${2000}ms 후 재시도`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        } catch (tokenError) {
+          devLog('FCM 토큰 발급 에러:', tokenError);
+          if (retryCount < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
+        retryCount++;
       }
+
+      if (!token) {
+        const tokenError = isTWA() ?
+          'APK 환경에서 FCM 토큰 발급에 실패했습니다. 인터넷 연결을 확인하고 다시 시도해주세요.' :
+          'FCM 토큰 발급에 실패했습니다.';
+        
+        throw new Error(tokenError);
+      }
+
+      devLog('3단계: 토큰 데이터베이스 저장');
 
       // 3. 토큰을 데이터베이스에 저장
       if (user) {
         await savePushToken(token);
+        devLog('토큰 저장 완료');
+      } else {
+        throw new Error('사용자 정보가 없습니다. 다시 로그인해주세요.');
       }
 
       setState(prev => ({
@@ -140,18 +197,25 @@ export function usePushNotifications() {
       }));
 
       toast({
-        title: '푸시 알림 설정 완료',
+        title: '✅ 푸시 알림 설정 완료',
         description: '새 메시지 알림을 받을 수 있습니다.'
       });
 
       return true;
     } catch (error) {
       console.error('푸시 알림 설정 실패:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+      const userFriendlyMessage = isTWA() ?
+        `APK 설정 실패: ${errorMessage}` :
+        `설정 실패: ${errorMessage}`;
+      
       toast({
-        title: '설정 실패',
-        description: '푸시 알림 설정 중 오류가 발생했습니다.',
+        title: '❌ 설정 실패',
+        description: userFriendlyMessage,
         variant: 'destructive'
       });
+      
       setState(prev => ({ ...prev, isLoading: false }));
       return false;
     }

@@ -29,12 +29,21 @@ export default function NotificationSettingsPage() {
     canSetup, 
     isSupported, 
     permission,
-    isGranted 
+    isGranted,
+    token
   } = usePushNotifications();
 
   const [settings, setSettings] = useState<NotificationSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [pushSetupStatus, setPushSetupStatus] = useState<string>('대기 중');
+  const [firebaseStatus, setFirebaseStatus] = useState<{
+    supported: boolean;
+    permission: string;
+    hasToken: boolean;
+    configLoaded: boolean;
+    error?: string;
+  } | null>(null);
 
   // 설정 로드
   useEffect(() => {
@@ -106,6 +115,50 @@ export default function NotificationSettingsPage() {
 
     loadSettings();
   }, [profile?.id, toast]);
+
+  // Firebase 상태 모니터링
+  useEffect(() => {
+    const checkFirebaseStatus = () => {
+      const status: {
+        supported: boolean;
+        permission: string;
+        hasToken: boolean;
+        configLoaded: boolean;
+        error?: string;
+      } = {
+        supported: isSupported,
+        permission: permission,
+        hasToken: !!token,
+        configLoaded: !!(
+          process.env.NEXT_PUBLIC_FIREBASE_API_KEY &&
+          process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID &&
+          process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY
+        )
+      };
+
+      // TWA 환경 감지
+      const isTWA = () => {
+        if (typeof window === 'undefined') return false;
+        const userAgent = navigator.userAgent;
+        const isWebView = /wv/.test(userAgent);
+        const isAndroid = /Android/.test(userAgent);
+        const hasTWAPackage = /com\.cosmosjeon\.faxi/.test(userAgent);
+        return isAndroid && (isWebView || hasTWAPackage);
+      };
+
+      if (!status.configLoaded) {
+        status.error = 'Firebase 설정이 누락되었습니다';
+      } else if (!status.supported) {
+        status.error = isTWA() ? 'TWA 환경에서 초기화 실패' : '브라우저가 푸시 알림을 지원하지 않습니다';
+      } else if (status.permission === 'denied') {
+        status.error = '알림 권한이 거부되었습니다. 브라우저 설정에서 허용해주세요';
+      }
+
+      setFirebaseStatus(status);
+    };
+
+    checkFirebaseStatus();
+  }, [isSupported, permission, token]);
 
   // 설정 업데이트
   const handleSettingChange = async (
@@ -283,6 +336,57 @@ export default function NotificationSettingsPage() {
     }
   };
 
+  // 향상된 푸시 알림 설정
+  const handlePushSetup = async () => {
+    setPushSetupStatus('권한 요청 중...');
+    
+    toast({
+      title: '푸시 알림 설정',
+      description: '권한을 요청하고 있습니다...',
+    });
+
+    try {
+      setPushSetupStatus('Firebase 초기화 중...');
+      
+      // Firebase 설정 상태 확인
+      if (!firebaseStatus?.configLoaded) {
+        throw new Error('Firebase 설정이 완료되지 않았습니다');
+      }
+
+      if (!firebaseStatus?.supported) {
+        throw new Error('이 환경에서는 푸시 알림을 지원하지 않습니다');
+      }
+
+      setPushSetupStatus('FCM 토큰 발급 중...');
+      toast({
+        title: '푸시 알림 설정',
+        description: 'FCM 토큰을 발급하고 있습니다...',
+      });
+
+      const success = await setupPushNotifications();
+
+      if (success) {
+        setPushSetupStatus('설정 완료');
+        toast({
+          title: '✅ 설정 완료!',
+          description: '푸시 알림을 받을 수 있습니다.',
+        });
+      } else {
+        setPushSetupStatus('설정 실패');
+        throw new Error('푸시 알림 설정에 실패했습니다');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+      setPushSetupStatus(`실패: ${errorMessage}`);
+      
+      toast({
+        title: '❌ 설정 실패',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 p-4">
@@ -376,13 +480,16 @@ export default function NotificationSettingsPage() {
                 {isGranted ? (
                   <div className="text-xs text-green-600">✅ 설정 완료</div>
                 ) : canSetup ? (
-                  <Button
-                    size="sm"
-                    onClick={setupPushNotifications}
-                    disabled={!isSupported}
-                  >
-                    {!isSupported ? "지원 안됨" : "설정하기"}
-                  </Button>
+                  <div className="space-y-2">
+                    <Button
+                      size="sm"
+                      onClick={handlePushSetup}
+                      disabled={!isSupported}
+                    >
+                      {!isSupported ? "지원 안됨" : "설정하기"}
+                    </Button>
+                    <div className="text-xs text-blue-600">{pushSetupStatus}</div>
+                  </div>
                 ) : permission === 'denied' ? (
                   <div className="text-xs text-red-600">❌ 권한 거부됨</div>
                 ) : (
@@ -431,6 +538,26 @@ export default function NotificationSettingsPage() {
                 수 있습니다.
               </p>
             </div>
+
+            {/* Firebase 상태 표시 (APK 디버깅용) */}
+            {firebaseStatus && (
+              <div className="bg-gray-50 p-3 rounded-lg border">
+                <p className="text-xs font-medium text-gray-700 mb-2">📱 시스템 상태</p>
+                <div className="space-y-1 text-xs text-gray-600">
+                  <div>브라우저 지원: {firebaseStatus.supported ? '✅' : '❌'}</div>
+                  <div>알림 권한: {
+                    firebaseStatus.permission === 'granted' ? '✅ 허용됨' : 
+                    firebaseStatus.permission === 'denied' ? '❌ 거부됨' : 
+                    '⏳ 대기 중'
+                  }</div>
+                  <div>FCM 토큰: {firebaseStatus.hasToken ? '✅ 발급됨' : '❌ 없음'}</div>
+                  <div>Firebase 설정: {firebaseStatus.configLoaded ? '✅ 로드됨' : '❌ 누락'}</div>
+                  {firebaseStatus.error && (
+                    <div className="text-red-600 mt-2">⚠️ {firebaseStatus.error}</div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* 개발 정보 (개발 중에만 표시) */}
             {process.env.NODE_ENV !== 'production' && (
