@@ -3,9 +3,14 @@
 import { useEffect } from 'react';
 import { registerServiceWorker, setupForegroundMessaging } from '@/lib/firebase-config';
 import { toast } from '@/hooks/use-toast';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useAuthStore } from '@/stores/auth.store';
 
 // 앱 시작시 푸시 알림 초기화
 export function PushNotificationInitializer() {
+  const { user } = useAuthStore();
+  const { setupPushNotifications } = usePushNotifications();
+
   useEffect(() => {
     const initializePushSystem = async () => {
       console.log('[PushInit] 푸시 알림 시스템 초기화 시작');
@@ -76,13 +81,68 @@ export function PushNotificationInitializer() {
       }
     };
 
+    // 자동 토큰 등록 로직
+    const attemptAutoTokenRegistration = async () => {
+      // 로그인되지 않은 경우 스킵
+      if (!user) {
+        console.log('[PushInit] 사용자 미로그인, 자동 토큰 등록 스킵');
+        return;
+      }
+
+      // 이미 시도한 경우 스킵 (최초 1회만)
+      const hasAttempted = localStorage.getItem(`push-auto-setup-${user.id}`);
+      if (hasAttempted) {
+        console.log('[PushInit] 이미 자동 토큰 등록 시도됨, 스킵');
+        return;
+      }
+
+      // 브라우저 지원 확인
+      const isSupported = 'Notification' in window && 'serviceWorker' in navigator;
+      if (!isSupported) {
+        console.log('[PushInit] 푸시 알림 미지원 환경, 자동 등록 스킵');
+        return;
+      }
+
+      // 권한이 이미 거부된 경우 스킵
+      if (Notification.permission === 'denied') {
+        console.log('[PushInit] 알림 권한 거부됨, 자동 등록 스킵');
+        localStorage.setItem(`push-auto-setup-${user.id}`, 'denied');
+        return;
+      }
+
+      try {
+        console.log('[PushInit] 자동 토큰 등록 시도 시작');
+        
+        // 자동 토큰 등록 시도
+        const success = await setupPushNotifications();
+        
+        // 시도했음을 기록 (성공/실패 무관)
+        localStorage.setItem(`push-auto-setup-${user.id}`, success ? 'success' : 'failed');
+        
+        if (success) {
+          console.log('[PushInit] ✅ 자동 토큰 등록 성공');
+        } else {
+          console.log('[PushInit] ❌ 자동 토큰 등록 실패');
+        }
+      } catch (error) {
+        console.error('[PushInit] 자동 토큰 등록 오류:', error);
+        localStorage.setItem(`push-auto-setup-${user.id}`, 'error');
+      }
+    };
+
     // TWA 환경에서는 약간의 지연 후 초기화
     const initDelay = typeof window !== 'undefined' && 
                      /Android/.test(navigator.userAgent) && 
                      /wv/.test(navigator.userAgent) ? 500 : 0;
 
+    // Service Worker 초기화
     setTimeout(initializePushSystem, initDelay);
-  }, []);
+    
+    // 자동 토큰 등록 (Service Worker 초기화 후)
+    setTimeout(() => {
+      attemptAutoTokenRegistration();
+    }, initDelay + 2000);
+  }, [user, setupPushNotifications]);
 
   // 포그라운드 메시지 처리
   const handleForegroundMessage = (payload: any) => {

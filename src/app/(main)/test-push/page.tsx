@@ -135,7 +135,7 @@ export default function TestPushPage() {
       navigator.serviceWorker.ready.then((registration) => {
         registration.showNotification('FAXI 테스트 알림', {
           body: 'TWA 환경에서 알림이 정상적으로 작동하는지 확인합니다.',
-          icon: '/icons/default-avatar.png',
+          icon: '/icons/default-avatar.jpg',
           badge: '/icons/faxi-badge.png',
           tag: 'faxi-test',
           requireInteraction: true
