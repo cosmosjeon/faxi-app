@@ -55,9 +55,14 @@ export default function PhotoEditPage() {
   // 편집 완료 후 프린트
   const handleEditComplete = async (editedImageBlob: Blob) => {
     try {
-      // Blob을 ArrayBuffer로 변환하여 프린터로 전송
-      const arrayBuffer = await editedImageBlob.arrayBuffer();
-      await printer.addPrintJob("image", arrayBuffer);
+      // Blob → DataURL 변환 후, ESC/POS 래스터 변환 경로로 인쇄
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(editedImageBlob);
+      });
+      await printer.printImage(dataUrl);
 
       toast({
         title: "편집 완료",

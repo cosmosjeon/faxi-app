@@ -10,8 +10,13 @@ import { printerToasts } from "@/lib/toasts";
 import { logger } from "@/features/utils";
 
 // 프린터 설정 (안전 인쇄 모드)
-const PRINTER_SAFE_WIDTH = 288; // 384 → 288로 축소
+const PRINTER_SAFE_WIDTH = (() => {
+  const v = typeof process !== 'undefined' ? Number(process.env.NEXT_PUBLIC_PRINT_WIDTH_DOTS) : NaN;
+  if (Number.isFinite(v) && v > 0) return Math.round(v);
+  return 288;
+})();
 const THRESHOLD = 160; // 128 → 160으로 상향(검은 픽셀 비율 축소)
+type DitherMode = "floyd" | "atkinson" | "bayer8" | "none";
 const GRAYSCALE_WEIGHTS = {
   R: 0.299,
   G: 0.587,
@@ -55,10 +60,32 @@ export function useBlePrinter() {
       throw new Error("프린터가 연결되지 않았습니다.");
     }
 
+    let lastJobId = "";
+
+    // 1) 이미지가 있으면 먼저 이미지 출력(ESC/POS 래스터)
+    if (messageData.imageUrl) {
+      const invert = shouldInvertForPrinter(store.connectedPrinter?.name);
+      debugPrinterConfig('printMessage(image)', {
+        deviceName: store.connectedPrinter?.name || '',
+        invertMode: getEnvString('NEXT_PUBLIC_PRINTER_INVERT_MODE'),
+        invertResolved: String(invert),
+        xorInvert: String(getEnvBool('NEXT_PUBLIC_FORCE_XOR_INVERT', false)),
+        escInvert: String(getEnvBool('NEXT_PUBLIC_PRINTER_INVERT_ESC', false)),
+        bitOrder: getEnvString('NEXT_PUBLIC_BIT_ORDER') || 'msb',
+        widthDots: String(PRINTER_SAFE_WIDTH),
+        dither: getEnvString('NEXT_PUBLIC_DITHER_MODE') || 'floyd',
+      });
+      const imageBytes = await convertImageToEscPosRaster(messageData.imageUrl, invert);
+      const buf = imageBytes.buffer.slice(imageBytes.byteOffset, imageBytes.byteOffset + imageBytes.byteLength);
+      lastJobId = store.addPrintJob("image", buf);
+    }
+
+    // 2) 메시지 본문 출력
     const printData = formatMessageForPrint(messageData);
-    const jobId = store.addPrintJob("message", printData);
+    lastJobId = store.addPrintJob("message", printData);
+
     toast({ title: "프린트 시작", description: `${messageData.senderName}님의 메시지를 출력합니다.` });
-    return jobId;
+    return lastJobId;
   };
 
   const printText = async (text: string): Promise<string> => {
@@ -72,7 +99,18 @@ export function useBlePrinter() {
   const printImage = async (imageUrl: string): Promise<string> => {
     if (store.status !== "connected") throw new Error("프린터가 연결되지 않았습니다.");
     try {
-      const imageBytes = await convertImageToEscPosRaster(imageUrl);
+      const invert = shouldInvertForPrinter(store.connectedPrinter?.name);
+      debugPrinterConfig('printImage', {
+        deviceName: store.connectedPrinter?.name || '',
+        invertMode: getEnvString('NEXT_PUBLIC_PRINTER_INVERT_MODE'),
+        invertResolved: String(invert),
+        xorInvert: String(getEnvBool('NEXT_PUBLIC_FORCE_XOR_INVERT', false)),
+        escInvert: String(getEnvBool('NEXT_PUBLIC_PRINTER_INVERT_ESC', false)),
+        bitOrder: getEnvString('NEXT_PUBLIC_BIT_ORDER') || 'msb',
+        widthDots: String(PRINTER_SAFE_WIDTH),
+        dither: getEnvString('NEXT_PUBLIC_DITHER_MODE') || 'floyd',
+      });
+      const imageBytes = await convertImageToEscPosRaster(imageUrl, invert);
       const buf = imageBytes.buffer.slice(imageBytes.byteOffset, imageBytes.byteOffset + imageBytes.byteLength);
       const jobId = store.addPrintJob("image", buf);
       printerToasts.printStarted();
@@ -142,21 +180,43 @@ function formatMessageForPrint(messageData: { text?: string; imageUrl?: string; 
 }
 
 // ESC/POS 래스터 이미지(안전 모드)
-async function convertImageToEscPosRaster(imageUrl: string): Promise<Uint8Array> {
+async function convertImageToEscPosRaster(imageUrl: string, invertBits = false): Promise<Uint8Array> {
   const bitmap = await loadAndDitherImage(imageUrl, PRINTER_SAFE_WIDTH);
-  const raster = packMonochromeToRaster(bitmap.pixels, bitmap.width, bitmap.height);
+  const bitOrder: 'msb' | 'lsb' = (getEnvString('NEXT_PUBLIC_BIT_ORDER') === 'lsb') ? 'lsb' : 'msb';
+  const raster = packMonochromeToRaster(bitmap.pixels, bitmap.width, bitmap.height, invertBits, bitOrder);
+
+  // 추가 반전(XOR) 옵션
+  const forceXor = getEnvBool('NEXT_PUBLIC_FORCE_XOR_INVERT', false);
+  if (forceXor) {
+    for (let i = 0; i < raster.data.length; i++) {
+      raster.data[i] = raster.data[i] ^ 0xff;
+    }
+  }
+
+  // ESC/POS: Reverse print mode (GS B n)
+  const escInvert = getEnvBool('NEXT_PUBLIC_PRINTER_INVERT_ESC', false);
+
   // GS v 0: 1D 76 30 m xL xH yL yH data
   const m = 0;
   const xL = raster.widthBytes & 0xff;
   const xH = (raster.widthBytes >> 8) & 0xff;
   const yL = raster.height & 0xff;
   const yH = (raster.height >> 8) & 0xff;
-  const header = new Uint8Array([0x1B,0x40, 0x1D,0x76,0x30, m, xL, xH, yL, yH]);
+  const escInit = new Uint8Array([0x1B,0x40]);
+  const gsV0Header = new Uint8Array([0x1D,0x76,0x30, m, xL, xH, yL, yH]);
   const tail = new Uint8Array([0x0A,0x0A]);
-  const out = new Uint8Array(header.length + raster.data.length + tail.length);
-  out.set(header, 0);
-  out.set(raster.data, header.length);
-  out.set(tail, header.length + raster.data.length);
+  const escOn = new Uint8Array([0x1D,0x42,0x01]);
+  const escOff = new Uint8Array([0x1D,0x42,0x00]);
+
+  const totalLength = escInit.length + (escInvert ? escOn.length : 0) + gsV0Header.length + raster.data.length + tail.length + (escInvert ? escOff.length : 0);
+  const out = new Uint8Array(totalLength);
+  let offset = 0;
+  out.set(escInit, offset); offset += escInit.length;
+  if (escInvert) { out.set(escOn, offset); offset += escOn.length; }
+  out.set(gsV0Header, offset); offset += gsV0Header.length;
+  out.set(raster.data, offset); offset += raster.data.length;
+  out.set(tail, offset); offset += tail.length;
+  if (escInvert) { out.set(escOff, offset); offset += escOff.length; }
   return out;
 }
 
@@ -166,24 +226,50 @@ async function loadAndDitherImage(src: string, maxWidth: number): Promise<{width
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       try {
-        const ratio = Math.min(maxWidth / img.width, maxWidth / img.height);
-        const w = Math.max(1, Math.round(img.width * ratio));
-        const h = Math.max(1, Math.round(img.height * ratio));
+        // 폭 기준 스케일링 + 좌우 여백 적용
+        const leftMargin = getEnvNumber('NEXT_PUBLIC_LEFT_MARGIN_DOTS', 0);
+        const contentWidth = Math.max(1, Math.round(maxWidth - Math.max(0, leftMargin)));
+        const ratio = contentWidth / img.width;
+        const w = Math.max(1, Math.round(maxWidth));
+        const hContent = Math.max(1, Math.round(img.height * ratio));
         const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
+        canvas.width = w; canvas.height = hContent;
         const ctx = canvas.getContext('2d');
         if (!ctx) throw new Error('Canvas context 생성 실패');
-        ctx.drawImage(img, 0, 0, w, h);
-        const { data } = ctx.getImageData(0, 0, w, h);
-        const pixels = new Uint8Array(w * h);
-        for (let y=0; y<h; y++) {
+        (ctx as any).imageSmoothingEnabled = true;
+        (ctx as any).imageSmoothingQuality = 'high';
+        // 배경 흰색 + 왼쪽 여백 채우기
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, hContent);
+        const offsetX = Math.max(0, Math.round(leftMargin));
+        ctx.drawImage(img, 0, 0, img.width, img.height, offsetX, 0, contentWidth, hContent);
+        const { data } = ctx.getImageData(0, 0, w, hContent);
+        // 전처리 파라미터 읽기
+        const gamma = getEnvNumber('NEXT_PUBLIC_DITHER_GAMMA', 1.8);
+        const contrast = getEnvNumber('NEXT_PUBLIC_DITHER_CONTRAST', 1.0);
+        const brightness = getEnvNumber('NEXT_PUBLIC_DITHER_BRIGHTNESS', 0);
+        const mode = getEnvDitherMode('NEXT_PUBLIC_DITHER_MODE', 'floyd');
+        const negativeMode = (getEnvString('NEXT_PUBLIC_IMAGE_NEGATIVE_MODE') || 'off').toLowerCase();
+
+        // RGBA -> grayscale(0..255), 감마/레벨 보정
+        const gray = new Uint8ClampedArray(w * hContent);
+        for (let y=0; y<hContent; y++) {
           for (let x=0; x<w; x++) {
             const i = (y*w + x) * 4;
-            const gray = data[i]*GRAYSCALE_WEIGHTS.R + data[i+1]*GRAYSCALE_WEIGHTS.G + data[i+2]*GRAYSCALE_WEIGHTS.B;
-            pixels[y*w + x] = gray < THRESHOLD ? 1 : 0; // 1=검은점(임계값 상향)
+            const g = data[i]*GRAYSCALE_WEIGHTS.R + data[i+1]*GRAYSCALE_WEIGHTS.G + data[i+2]*GRAYSCALE_WEIGHTS.B;
+            let gv = applyGammaAndLevels(g, gamma, contrast, brightness);
+            if (negativeMode === 'on') gv = 255 - gv;
+            gray[y*w + x] = gv;
           }
         }
-        resolve({ width: w, height: h, pixels });
+
+        // 디더링
+        let pixels: Uint8Array;
+        if (mode === 'floyd') pixels = ditherFloydSteinberg(gray, w, hContent, THRESHOLD);
+        else if (mode === 'atkinson') pixels = ditherAtkinson(gray, w, hContent, THRESHOLD);
+        else if (mode === 'bayer8') pixels = ditherBayer8(gray, w, hContent, THRESHOLD);
+        else pixels = thresholdOnly(gray, w, hContent, THRESHOLD);
+        resolve({ width: w, height: hContent, pixels });
       } catch (e) { reject(e); }
     };
     img.onerror = () => reject(new Error('이미지 로드 실패'));
@@ -191,16 +277,146 @@ async function loadAndDitherImage(src: string, maxWidth: number): Promise<{width
   });
 }
 
-function packMonochromeToRaster(pixels: Uint8Array, width: number, height: number): { widthBytes: number; height: number; data: Uint8Array } {
+function packMonochromeToRaster(pixels: Uint8Array, width: number, height: number, invertBits = false, bitOrder: 'msb' | 'lsb' = 'msb'): { widthBytes: number; height: number; data: Uint8Array } {
   const widthBytes = Math.ceil(width / 8);
   const data = new Uint8Array(widthBytes * height);
   for (let y=0; y<height; y++) {
     for (let x=0; x<width; x++) {
-      const bit = pixels[y*width + x]; // 1=검정
+      const isBlack = pixels[y*width + x] === 1; // 1=검정
+      const bit = invertBits ? (isBlack ? 0 : 1) : (isBlack ? 1 : 0);
       const byteIndex = y*widthBytes + (x >> 3);
-      const bitIndex = 7 - (x & 7);
+      const bitIndex = bitOrder === 'msb' ? (7 - (x & 7)) : (x & 7);
       if (bit) data[byteIndex] |= (1 << bitIndex);
     }
   }
   return { widthBytes, height, data };
+}
+
+function shouldInvertForPrinter(name?: string | null): boolean {
+  // NEXT_PUBLIC_PRINTER_INVERT_MODE: 'on' | 'off' | 'auto'
+  const mode = typeof process !== 'undefined' ? String(process.env.NEXT_PUBLIC_PRINTER_INVERT_MODE || '').toLowerCase() : '';
+  if (mode === 'on') return true;
+  if (mode === 'off') return false;
+  // legacy: NEXT_PUBLIC_PRINTER_INVERT=1 → on
+  const legacy = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_PRINTER_INVERT === '1';
+  if (legacy) return true;
+  if (!name) return false;
+  const upper = name.toUpperCase();
+  return upper.includes('MTP-II') || upper.includes('MPT-II');
+}
+
+// ====== 이미지 품질 향상 도우미들 ======
+function getEnvNumber(key: string, fallback: number): number {
+  const v = typeof process !== 'undefined' ? Number(process.env[key]) : NaN;
+  return Number.isFinite(v) ? v : fallback;
+}
+
+function getEnvDitherMode(key: string, fallback: DitherMode): DitherMode {
+  const v = typeof process !== 'undefined' ? String(process.env[key] || '').toLowerCase() : '';
+  if (v === 'floyd' || v === 'atkinson' || v === 'bayer8' || v === 'none') return v;
+  return fallback;
+}
+
+function getEnvBool(key: string, fallback = false): boolean {
+  const v = typeof process !== 'undefined' ? (process.env[key] ?? '') : '';
+  if (v === '1' || String(v).toLowerCase() === 'true') return true;
+  if (v === '0' || String(v).toLowerCase() === 'false') return false;
+  return fallback;
+}
+
+function getEnvString(key: string): string {
+  return typeof process !== 'undefined' ? String(process.env[key] ?? '') : '';
+}
+
+function debugPrinterConfig(tag: string, cfg: Record<string,string>) {
+  const enabled = getEnvBool('NEXT_PUBLIC_DEBUG_PRINTER', false);
+  if (!enabled) return;
+  try { console.log(`[PrinterDebug] ${tag}`, cfg); } catch {}
+}
+
+function applyGammaAndLevels(gray: number, gamma = 1.8, contrast = 1.0, brightness = 0): number {
+  // gamma: >1로 밝은 영역 확장, contrast: 1.0=기본, brightness: -128..+128
+  let x = Math.pow(Math.max(0, Math.min(255, gray)) / 255, 1 / Math.max(0.01, gamma)) * 255;
+  x = (x - 128) * contrast + 128 + brightness;
+  return Math.max(0, Math.min(255, Math.round(x)));
+}
+
+function thresholdOnly(gray: Uint8ClampedArray, w: number, h: number, threshold: number): Uint8Array {
+  const out = new Uint8Array(w * h);
+  for (let i = 0; i < out.length; i++) out[i] = gray[i] < threshold ? 1 : 0;
+  return out;
+}
+
+function ditherFloydSteinberg(gray: Uint8ClampedArray, w: number, h: number, threshold: number): Uint8Array {
+  const out = new Uint8Array(w * h);
+  const buf = new Float32Array(gray.length);
+  for (let i = 0; i < gray.length; i++) buf[i] = gray[i];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      const oldPx = buf[i];
+      const newPx = oldPx < threshold ? 0 : 255;
+      out[i] = newPx < threshold ? 1 : 0;
+      const err = oldPx - newPx;
+      if (x + 1 < w) buf[i + 1] += err * 7 / 16;
+      if (y + 1 < h) {
+        if (x > 0) buf[i + w - 1] += err * 3 / 16;
+        buf[i + w] += err * 5 / 16;
+        if (x + 1 < w) buf[i + w + 1] += err * 1 / 16;
+      }
+    }
+  }
+  return out;
+}
+
+function ditherAtkinson(gray: Uint8ClampedArray, w: number, h: number, threshold: number): Uint8Array {
+  const out = new Uint8Array(w * h);
+  const buf = new Float32Array(gray.length);
+  for (let i = 0; i < gray.length; i++) buf[i] = gray[i];
+  const distribute = (i: number, x: number, y: number, err: number) => {
+    // 1/8씩 6개 픽셀로 분배
+    const share = err / 8;
+    if (x + 1 < w) buf[i + 1] += share;
+    if (x + 2 < w) buf[i + 2] += share;
+    if (y + 1 < h) {
+      if (x > 0) buf[i + w - 1] += share;
+      buf[i + w] += share;
+      if (x + 1 < w) buf[i + w + 1] += share;
+    }
+    if (y + 2 < h) buf[i + 2 * w] += share;
+  };
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      const oldPx = buf[i];
+      const newPx = oldPx < threshold ? 0 : 255;
+      out[i] = newPx < threshold ? 1 : 0;
+      const err = oldPx - newPx;
+      distribute(i, x, y, err);
+    }
+  }
+  return out;
+}
+
+function ditherBayer8(gray: Uint8ClampedArray, w: number, h: number, threshold: number): Uint8Array {
+  // 8x8 Bayer matrix (0..63)
+  const bayer = [
+    0, 32, 8, 40, 2, 34, 10, 42,
+    48, 16, 56, 24, 50, 18, 58, 26,
+    12, 44, 4, 36, 14, 46, 6, 38,
+    60, 28, 52, 20, 62, 30, 54, 22,
+    3, 35, 11, 43, 1, 33, 9, 41,
+    51, 19, 59, 27, 49, 17, 57, 25,
+    15, 47, 7, 39, 13, 45, 5, 37,
+    63, 31, 55, 23, 61, 29, 53, 21,
+  ];
+  const out = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      const t = (bayer[(y & 7) * 8 + (x & 7)] + 0.5) * (255 / 64);
+      out[i] = gray[i] < Math.min(255, Math.max(0, threshold + t - 127)) ? 1 : 0;
+    }
+  }
+  return out;
 }

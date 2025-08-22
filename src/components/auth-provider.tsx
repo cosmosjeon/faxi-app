@@ -48,6 +48,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } = await supabase.auth.getSession();
 
         if (error) {
+          const msg = (error as any)?.message || String(error);
+          const isInvalidRefresh =
+            msg.includes("Invalid Refresh Token") ||
+            msg.includes("Refresh Token Not Found") ||
+            msg.includes("invalid_refresh_token");
+
+          if (isInvalidRefresh) {
+            // 잘못된/만료된 리프레시 토큰이 남아있는 경우 토큰 정리
+            try { await supabase.auth.signOut(); } catch {}
+          }
+
           console.error("세션 조회 실패:", error);
           reset();
           return;

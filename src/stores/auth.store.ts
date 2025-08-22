@@ -61,7 +61,12 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     set({ isLoading: true }); // 로딩 상태 시작
     try {
       // 리다이렉트 URL 설정 (인증 완료 후 돌아올 주소)
-      const redirectUrl = `${window.location.origin}/auth/callback`;
+      // 로컬(npm start)에서는 https가 아닌 http로 강제하여 SSL 오류 방지
+      const { protocol, hostname, port } = window.location;
+      const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
+      const effectiveProtocol = isLocal ? "http:" : protocol;
+      const origin = `${effectiveProtocol}//${hostname}${port ? `:${port}` : ""}`;
+      const redirectUrl = `${origin}/auth/callback`;
       logger.info("🔄 OAuth Debug:", {
         provider,
         redirectUrl,

@@ -16,6 +16,11 @@ export async function middleware(request: NextRequest) {
   }
 
   // 서버용 Supabase 클라이언트 생성
+  // 로컬 프로덕션(http)에서는 secure 쿠키가 저장되지 않으므로, 프로토콜에 따라 secure 여부를 결정
+  const forwardedProto = request.headers.get("x-forwarded-proto");
+  const protocolFromUrl = request.nextUrl.protocol; // e.g. "http:" | "https:"
+  const isSecure = (forwardedProto ?? protocolFromUrl)?.includes("https");
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -26,9 +31,12 @@ export async function middleware(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
+            response.cookies.set(name, value, { ...options, secure: isSecure })
           );
         },
+      },
+      cookieOptions: {
+        secure: isSecure,
       },
     }
   );

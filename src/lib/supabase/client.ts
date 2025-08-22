@@ -11,8 +11,8 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!; // 익명 �
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     // OAuth 인증 설정
-    flowType: "implicit", // Implicit 플로우 사용 (PKCE 대신)
-    detectSessionInUrl: true, // URL에서 세션 정보를 자동으로 감지
+    flowType: "pkce",
+    detectSessionInUrl: false, // 클라이언트 콜백 페이지에서 명시적으로 처리
     autoRefreshToken: true, // 토큰 자동 갱신
     persistSession: true, // 세션 정보를 로컬 스토리지에 저장
   },

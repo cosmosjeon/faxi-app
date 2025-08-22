@@ -6,6 +6,7 @@ export async function GET(request: NextRequest) {
   const error_param = searchParams.get("error");
   const error_description = searchParams.get("error_description");
   let next = searchParams.get("next") ?? "/";
+  const code = searchParams.get("code");
 
   if (process.env.NODE_ENV !== 'production') {
     console.log("=== OAuth Callback Debug ===");
@@ -25,24 +26,29 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Implicit 플로우에서는 코드 교환이 필요 없음
-  // Supabase가 자동으로 URL에서 세션을 감지하고 처리함
-  if (process.env.NODE_ENV !== 'production') {
-    console.log("✅ Implicit flow - redirecting to:", next);
+  // PKCE 플로우: 서버 교환을 시도하되, code_verifier 미존재 등으로 실패하면 클라이언트 교환 페이지로 폴백
+  if (code) {
+    try {
+      const supabase = await createClient();
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (error) {
+        const fallback = new URL(`/auth/callback/complete?code=${encodeURIComponent(code)}&next=${encodeURIComponent(next)}`, origin);
+        return NextResponse.redirect(fallback);
+      }
+    } catch {
+      const fallback = new URL(`/auth/callback/complete?code=${encodeURIComponent(code)}&next=${encodeURIComponent(next)}`, origin);
+      return NextResponse.redirect(fallback);
+    }
   }
 
   // 환경별 리디렉션 처리
   const forwardedHost = request.headers.get("x-forwarded-host");
-  const isLocalEnv = process.env.NODE_ENV === "development";
+  const forwardedProto = request.headers.get("x-forwarded-proto");
+  const isHttps = (forwardedProto ?? request.nextUrl.protocol).includes("https");
+  const scheme = isHttps ? "https" : "http";
 
-  if (isLocalEnv) {
-    // 로컬 환경에서는 origin 사용
-    return NextResponse.redirect(`${origin}${next}`);
-  } else if (forwardedHost) {
-    // 프로덕션에서 x-forwarded-host가 있으면 사용
-    return NextResponse.redirect(`https://${forwardedHost}${next}`);
-  } else {
-    // 기본적으로 origin 사용
-    return NextResponse.redirect(`${origin}${next}`);
+  if (forwardedHost) {
+    return NextResponse.redirect(`${scheme}://${forwardedHost}${next}`);
   }
+  return NextResponse.redirect(`${origin}${next}`);
 }

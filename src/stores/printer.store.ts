@@ -37,8 +37,10 @@ interface BluetoothRemoteGATTService {
 
 interface BluetoothRemoteGATTCharacteristic {
   writeValueWithoutResponse(value: BufferSource): Promise<void>;
+  writeValue?(value: BufferSource): Promise<void>;
   startNotifications(): Promise<BluetoothRemoteGATTCharacteristic>;
   addEventListener(type: string, listener: EventListener): void;
+  removeEventListener(type: string, listener: EventListener): void;
 }
 
 // 16-bit → 128-bit Base UUID
@@ -570,11 +572,19 @@ async function awaitAckOrDelay(
   }
   await new Promise<void>((resolve) => {
     const timer = setTimeout(() => {
+      cleanup();
       resolve();
     }, timeoutMs);
-    const handler = () => { clearTimeout(timer); resolve(); };
-    const noop = handler as unknown as EventListener; // 동일 참조 유지용
-    notifyChar.addEventListener('characteristicvaluechanged', noop);
+    const onChanged = () => {
+      clearTimeout(timer);
+      cleanup();
+      resolve();
+    };
+    const listener = onChanged as unknown as EventListener;
+    const cleanup = () => {
+      try { notifyChar.removeEventListener('characteristicvaluechanged', listener); } catch {}
+    };
+    notifyChar.addEventListener('characteristicvaluechanged', listener);
   });
 }
 
@@ -595,7 +605,16 @@ async function writeInChunks(
 ) {
   for (let i = 0; i < data.length; i += chunkSize) {
     const chunk = data.slice(i, i + chunkSize);
-    await characteristic.writeValueWithoutResponse(chunk);
+    try {
+      await characteristic.writeValueWithoutResponse(chunk);
+    } catch (e) {
+      // 일부 디바이스는 writeWithResponse만 허용
+      if (typeof characteristic.writeValue === 'function') {
+        await characteristic.writeValue(chunk);
+      } else {
+        throw e;
+      }
+    }
     // 약간의 딜레이로 안정성 확보
     // eslint-disable-next-line no-await-in-loop
     await new Promise((r) => setTimeout(r, delayMs));

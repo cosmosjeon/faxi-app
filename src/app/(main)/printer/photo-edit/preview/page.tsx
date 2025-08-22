@@ -64,8 +64,11 @@ export default function PhotoPreviewPage() {
       // 이미지 로드
       const img = new window.Image();
       img.onload = () => {
-        // 프린터 출력 크기 설정 (300dpi 기준, 58mm 폭)
-        const printWidth = 384;
+        // 프린터 출력 크기 설정 (환경변수로 오버라이드 가능)
+        const printWidth = (() => {
+          const v = typeof process !== 'undefined' ? Number(process.env.NEXT_PUBLIC_PRINT_WIDTH_DOTS) : NaN;
+          return Number.isFinite(v) && v > 0 ? Math.round(v) : 288;
+        })();
         const cropAspectRatio = data.crop.width / data.crop.height;
         const imageHeight = Math.round(printWidth / cropAspectRatio);
 
@@ -178,25 +181,18 @@ export default function PhotoPreviewPage() {
     }
 
     try {
-      // Canvas를 Blob으로 변환
-      canvasRef.current.toBlob(async (blob) => {
-        if (!blob) {
-          throw new Error("이미지 생성 실패");
-        }
+      // Canvas를 DataURL로 변환하여 ESC/POS 래스터 인쇄 경로 사용
+      const dataUrl = canvasRef.current.toDataURL("image/png");
+      await printer.printImage(dataUrl);
 
-        // Blob을 ArrayBuffer로 변환하여 프린터로 전송
-        const arrayBuffer = await blob.arrayBuffer();
-        await printer.addPrintJob("image", arrayBuffer);
+      toast({
+        title: "프린트 시작",
+        description: "편집된 이미지가 프린트 대기열에 추가되었습니다.",
+      });
 
-        toast({
-          title: "프린트 시작",
-          description: "편집된 이미지가 프린트 대기열에 추가되었습니다.",
-        });
-
-        // 편집 데이터 정리 후 프린터 페이지로 이동
-        sessionStorage.removeItem("photoEditData");
-        router.push("/printer");
-      }, "image/png");
+      // 편집 데이터 정리 후 프린터 페이지로 이동
+      sessionStorage.removeItem("photoEditData");
+      router.push("/printer");
     } catch (error) {
       console.error("프린트 실패:", error);
       toast({
