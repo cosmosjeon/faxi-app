@@ -356,7 +356,7 @@ export default function ComposePage() {
             </h1>
             <p className="text-gray-600 mt-1">
               {editMode === "imageEdit"
-                ? "사진을 크롭하고 문구를 추가해보세요"
+                ? "사진을 크롭하고 저장하세요"
                 : "친구에게 특별한 메시지를 보내보세요"}
             </p>
           </div>
@@ -529,7 +529,7 @@ export default function ComposePage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="teaser">LCD 티저 (선택)</Label>
+                  <Label htmlFor="teaser">LCD 티저</Label>
                   <Input
                     id="teaser"
                     placeholder="10자 이내 짧은 미리보기"

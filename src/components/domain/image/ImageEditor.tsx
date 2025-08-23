@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { RotateCw, Type, Eye } from "lucide-react";
+import { RotateCw, Eye } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useRouter } from "next/navigation";
@@ -26,7 +25,6 @@ interface CropData {
 interface EditState {
   rotation: number; // 0, 90, 180, 270
   crop: CropData;
-  text: string;
 }
 
 export function ImageEditor({
@@ -44,7 +42,6 @@ export function ImageEditor({
   const [editState, setEditState] = useState<EditState>({
     rotation: 0,
     crop: { x: 0, y: 0, width: 100, height: 100 },
-    text: "",
   });
   const [isLoaded, setIsLoaded] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -85,14 +82,8 @@ export function ImageEditor({
       const cropAspectRatio = editState.crop.width / editState.crop.height;
       const imageHeight = Math.round(printWidth / cropAspectRatio);
 
-      // 문구가 있을 경우 추가 공간 계산
-      const textHeight = editState.text.trim() ? 60 * previewScale : 0;
-      const padding = editState.text.trim() ? 15 * previewScale : 0;
-
-      const totalHeight = imageHeight + textHeight + padding;
-
       canvas.width = printWidth;
-      canvas.height = totalHeight;
+      canvas.height = imageHeight;
 
       // 배경 흰색으로 초기화
       ctx.fillStyle = "white";
@@ -117,42 +108,7 @@ export function ImageEditor({
       );
       ctx.restore();
 
-      // 텍스트를 이미지 아래에 별도로 추가
-      if (editState.text.trim()) {
-        ctx.fillStyle = "black";
-        ctx.font = `${14 * previewScale}px sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-
-        const textStartY = imageHeight + padding;
-        const maxWidth = printWidth - 20 * previewScale;
-        const words = editState.text.split(" ");
-        const lines: string[] = [];
-        let currentLine = "";
-
-        words.forEach((word) => {
-          const testLine = currentLine + (currentLine ? " " : "") + word;
-          const metrics = ctx.measureText(testLine);
-
-          if (metrics.width > maxWidth && currentLine) {
-            lines.push(currentLine);
-            currentLine = word;
-          } else {
-            currentLine = testLine;
-          }
-        });
-
-        if (currentLine) {
-          lines.push(currentLine);
-        }
-
-        // 각 줄을 그리기
-        const lineHeight = 18 * previewScale;
-        lines.forEach((line, index) => {
-          const y = textStartY + index * lineHeight + 6 * previewScale;
-          ctx.fillText(line, canvas.width / 2, y);
-        });
-      }
+      // 텍스트 합성 제거됨
 
       // Canvas를 Data URL로 변환
       const dataUrl = canvas.toDataURL("image/png");
@@ -189,13 +145,7 @@ export function ImageEditor({
     }));
   };
 
-  // 문구 변경
-  const handleTextChange = (value: string) => {
-    setEditState((prev) => ({
-      ...prev,
-      text: value,
-    }));
-  };
+  // 문구 입력 제거됨
 
   // 크롭 영역 드래그 시작
   const handleCropMouseDown = (
@@ -295,9 +245,7 @@ export function ImageEditor({
         const printWidth = 384;
         const cropAspectRatio = editState.crop.width / editState.crop.height;
         const imageHeight = Math.round(printWidth / cropAspectRatio);
-        const textHeight = editState.text.trim() ? 100 : 0;
-        const padding = editState.text.trim() ? 25 : 0;
-        const totalHeight = imageHeight + textHeight + padding;
+        const totalHeight = imageHeight;
 
         canvas.width = printWidth;
         canvas.height = totalHeight;
@@ -325,42 +273,7 @@ export function ImageEditor({
         );
         ctx.restore();
 
-        // 텍스트 추가
-        if (editState.text.trim()) {
-          ctx.fillStyle = "black";
-          ctx.font = "14px sans-serif";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "top";
-
-          const textStartY = imageHeight + padding;
-          const maxWidth = printWidth - 20;
-          const words = editState.text.split(" ");
-          const lines: string[] = [];
-          let currentLine = "";
-
-          words.forEach((word) => {
-            const testLine = currentLine + (currentLine ? " " : "") + word;
-            const metrics = ctx.measureText(testLine);
-
-            if (metrics.width > maxWidth && currentLine) {
-              lines.push(currentLine);
-              currentLine = word;
-            } else {
-              currentLine = testLine;
-            }
-          });
-
-          if (currentLine) {
-            lines.push(currentLine);
-          }
-
-          // 각 줄을 그리기
-          const lineHeight = 18;
-          lines.forEach((line, index) => {
-            const y = textStartY + index * lineHeight + 6;
-            ctx.fillText(line, canvas.width / 2, y);
-          });
-        }
+        // 텍스트 합성 제거됨
 
         // Canvas를 Blob으로 변환
         canvas.toBlob((blob) => {
@@ -381,7 +294,6 @@ export function ImageEditor({
           imageBase64: base64Image,
           rotation: editState.rotation,
           crop: editState.crop,
-          text: editState.text,
         };
 
         sessionStorage.setItem("photoEditData", JSON.stringify(editData));
@@ -509,29 +421,7 @@ export function ImageEditor({
           </div>
         </div>
 
-        <Separator />
-
-        {/* 문구 입력 */}
-        <div>
-          <Label
-            htmlFor="text-input"
-            className="text-sm font-medium flex items-center gap-1"
-          >
-            <Type size={14} />
-            문구 추가 (사진 아래 표시)
-          </Label>
-          <Input
-            id="text-input"
-            value={editState.text}
-            onChange={(e) => handleTextChange(e.target.value)}
-            placeholder="사진 아래에 추가할 문구를 입력하세요"
-            className="mt-1"
-            maxLength={100}
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            {editState.text.length}/100자 (사진과 겹치지 않고 아래에 표시됩니다)
-          </p>
-        </div>
+        {/* 문구 입력 제거됨 */}
       </div>
 
       {/* 숨겨진 Canvas들 */}

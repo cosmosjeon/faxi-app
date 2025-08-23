@@ -110,7 +110,7 @@ export default function PhotoEditPage() {
           <div>
             <h1 className="text-xl font-bold text-gray-900">사진 편집</h1>
             <p className="text-sm text-gray-600">
-              사진을 편집하고 문구를 추가하세요
+              사진을 편집하고 저장하세요
             </p>
           </div>
         </div>

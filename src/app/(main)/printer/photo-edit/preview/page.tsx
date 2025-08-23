@@ -72,11 +72,8 @@ export default function PhotoPreviewPage() {
         const cropAspectRatio = data.crop.width / data.crop.height;
         const imageHeight = Math.round(printWidth / cropAspectRatio);
 
-        // 문구가 있을 경우 추가 공간 계산
-        const textHeight = data.text.trim() ? 100 : 0;
-        const padding = data.text.trim() ? 25 : 0;
-
-        const totalHeight = imageHeight + textHeight + padding;
+        // 텍스트 합성 제거 → 이미지 높이만 사용
+        const totalHeight = imageHeight;
 
         canvas.width = printWidth;
         canvas.height = totalHeight;
@@ -104,42 +101,7 @@ export default function PhotoPreviewPage() {
         );
         ctx.restore();
 
-        // 텍스트를 이미지 아래에 별도로 추가
-        if (data.text.trim()) {
-          ctx.fillStyle = "black";
-          ctx.font = "22px sans-serif";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "top";
-
-          const textStartY = imageHeight + padding;
-          const maxWidth = printWidth - 40;
-          const words = data.text.split(" ");
-          const lines: string[] = [];
-          let currentLine = "";
-
-          words.forEach((word) => {
-            const testLine = currentLine + (currentLine ? " " : "") + word;
-            const metrics = ctx.measureText(testLine);
-
-            if (metrics.width > maxWidth && currentLine) {
-              lines.push(currentLine);
-              currentLine = word;
-            } else {
-              currentLine = testLine;
-            }
-          });
-
-          if (currentLine) {
-            lines.push(currentLine);
-          }
-
-          // 각 줄을 그리기
-          const lineHeight = 30;
-          lines.forEach((line, index) => {
-            const y = textStartY + index * lineHeight + 15;
-            ctx.fillText(line, canvas.width / 2, y);
-          });
-        }
+        // 텍스트 합성 제거됨
 
         // Canvas를 이미지 URL로 변환하여 미리보기 표시
         const dataUrl = canvas.toDataURL("image/png");
@@ -272,7 +234,6 @@ export default function PhotoPreviewPage() {
                 {editData && (
                   <div className="text-xs text-gray-500 space-y-1">
                     <p>• 회전: {editData.rotation}°</p>
-                    {editData.text && <p>• 문구: &quot;{editData.text}&quot;</p>}
                   </div>
                 )}
               </div>

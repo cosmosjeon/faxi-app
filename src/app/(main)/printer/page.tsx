@@ -26,6 +26,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
@@ -48,6 +49,7 @@ export default function PrinterPage() {
   const router = useRouter();
   const printer = useBlePrinter();
   const { profile } = useAuthStore();
+  const [textOnly, setTextOnly] = useState("");
   
   // 무한 프린트 반복 방지를 위한 플래그
   const [hasHandledQueuedMessages, setHasHandledQueuedMessages] = useState(false);
@@ -272,6 +274,26 @@ export default function PrinterPage() {
     }
   };
 
+  // 텍스트만 프린트
+  const handleTextOnlyPrint = async () => {
+    if (!printer.isConnected) {
+      toast({ title: "프린터 연결 필요", description: "먼저 프린터를 연결해주세요.", variant: "destructive" });
+      return;
+    }
+    const content = textOnly.trim();
+    if (!content) {
+      toast({ title: "내용 없음", description: "출력할 텍스트를 입력해주세요.", variant: "destructive" });
+      return;
+    }
+    try {
+      await printer.printText(content);
+      setTextOnly("");
+    } catch (error) {
+      console.error("텍스트 프린트 실패:", error);
+      toast({ title: "프린트 실패", description: "텍스트를 프린트할 수 없습니다.", variant: "destructive" });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-md mx-auto space-y-4">
@@ -488,6 +510,32 @@ export default function PrinterPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* 텍스트만 프린트 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText size={20} />
+              텍스트만 프린트
+            </CardTitle>
+            <CardDescription>간단한 문구를 바로 출력합니다</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Textarea
+              rows={4}
+              placeholder="출력할 텍스트를 입력하세요 (한글은 일부 프린터에서 제한될 수 있습니다)"
+              value={textOnly}
+              onChange={(e) => setTextOnly(e.target.value)}
+              maxLength={200}
+            />
+            <div className="flex justify-end">
+              <Button onClick={handleTextOnlyPrint} disabled={!printer.isConnected || !textOnly.trim()}>
+                <Printer className="mr-2" size={16} />
+                텍스트 출력
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* 기능 버튼들 */}
         <div className="grid grid-cols-2 gap-4">
