@@ -40,11 +40,11 @@ function validateFirebaseConfig() {
   const missing = required.filter(key => !firebaseConfig[key]);
   
   devLog('Firebase 설정 검증:', {
-    apiKey: firebaseConfig.apiKey ? `${firebaseConfig.apiKey.substring(0, 10)}...` : '없음',
-    authDomain: firebaseConfig.authDomain || '없음',
-    projectId: firebaseConfig.projectId || '없음',
-    messagingSenderId: firebaseConfig.messagingSenderId || '없음',
-    appId: firebaseConfig.appId ? `${firebaseConfig.appId.substring(0, 20)}...` : '없음'
+    apiKey: firebaseConfig.apiKey ? 'set' : '없음',
+    authDomain: firebaseConfig.authDomain ? 'set' : '없음',
+    projectId: firebaseConfig.projectId ? 'set' : '없음',
+    messagingSenderId: firebaseConfig.messagingSenderId ? 'set' : '없음',
+    appId: firebaseConfig.appId ? 'set' : '없음'
   });
   
   if (missing.length > 0) {
@@ -129,7 +129,7 @@ export const getFCMToken = async (): Promise<string | null> => {
     }
     
     if (token) {
-      devLog('✅ FCM 토큰 발급 성공:', token.substring(0, 20) + '...', {
+      devLog('✅ FCM 토큰 발급 성공:', token ? token.substring(0, 10) + '...' : 'none', {
         환경: twaEnv ? 'TWA' : '웹',
         재시도횟수: retryCount
       });

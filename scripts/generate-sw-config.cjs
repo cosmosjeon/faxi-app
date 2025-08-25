@@ -59,9 +59,8 @@ const outFile = path.join(outDir, 'firebase-config.js');
 
 fs.mkdirSync(outDir, { recursive: true });
 
-// 개발 환경에서만 firebase-config.js 생성 (보안 강화)
-const isProduction = process.env.NODE_ENV === 'production';
-const shouldGenerateConfig = !isProduction || process.env.GENERATE_SW_CONFIG === 'true';
+// 명시적으로 요청한 경우에만 firebase-config.js 생성 (보안 강화)
+const shouldGenerateConfig = process.env.GENERATE_SW_CONFIG === 'true';
 
 if (shouldGenerateConfig) {
   const banner = '/* This file is generated from environment variables. Do not commit. */\n';
@@ -69,13 +68,13 @@ if (shouldGenerateConfig) {
 
   try {
     fs.writeFileSync(outFile, content, 'utf8');
-    console.log('[generate-sw-config] Generated public/firebase-config.js (apiKey: ' + (config.apiKey ? config.apiKey.slice(0, 6) + '...' : 'unset') + ')');
+    console.log('[generate-sw-config] Generated public/firebase-config.js (apiKey: ' + (config.apiKey ? 'set' : 'unset') + ')');
   } catch (err) {
     console.error('[generate-sw-config] Failed to write', outFile, err);
     process.exit(0);
   }
 } else {
-  console.log('[generate-sw-config] Skipped firebase-config.js generation in production mode');
+  console.log('[generate-sw-config] Skipped firebase-config.js generation (use GENERATE_SW_CONFIG=true to enable)');
   
   // 프로덕션에서는 파일이 있다면 삭제
   try {
