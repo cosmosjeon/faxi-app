@@ -90,6 +90,20 @@ export function useBlePrinter() {
 
   const printText = async (text: string): Promise<string> => {
     if (store.status !== "connected") throw new Error("프린터가 연결되지 않았습니다.");
+
+    // ASCII 이외 문자가 포함되면 래스터 이미지로 자동 폴백 (한글/이모지 호환)
+    const hasNonAscii = /[^\x00-\x7F]/.test(text);
+    if (hasNonAscii) {
+      // 간단한 텍스트 캔버스 렌더 후 ESC/POS 래스터로 전송
+      const dataUrl = await renderTextToDataUrl(text);
+      const invert = shouldInvertForPrinter(store.connectedPrinter?.name);
+      const imageBytes = await convertImageToEscPosRaster(dataUrl, invert);
+      const buf = imageBytes.buffer.slice(imageBytes.byteOffset, imageBytes.byteOffset + imageBytes.byteLength);
+      const jobId = store.addPrintJob("image", buf);
+      toast({ title: "텍스트 프린트", description: "텍스트를 이미지로 변환하여 출력합니다." });
+      return jobId;
+    }
+
     const jobId = store.addPrintJob("text", text);
     toast({ title: "텍스트 프린트", description: "텍스트를 출력합니다." });
     return jobId;
@@ -332,6 +346,60 @@ function debugPrinterConfig(tag: string, cfg: Record<string,string>) {
   const enabled = getEnvBool('NEXT_PUBLIC_DEBUG_PRINTER', false);
   if (!enabled) return;
   try { console.log(`[PrinterDebug] ${tag}`, cfg); } catch {}
+}
+
+// 텍스트를 캔버스로 렌더링하여 Data URL 반환 (한글 지원)
+async function renderTextToDataUrl(text: string): Promise<string> {
+  const width = Math.max(64, PRINTER_SAFE_WIDTH);
+  // 대략적 줄바꿈을 고려한 높이 추정 (최대 6줄 기준 확대)
+  const lineHeight = 28;
+  const lines = wrapText(text, 18); // 18자 기준 개행(한글 가변폭 보정용 보수값)
+  const height = Math.max(64, Math.min(2000, lines.length * lineHeight + 24));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas context 생성 실패');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = '#000000';
+  ctx.font = 'bold 20px system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, Apple SD Gothic Neo, Malgun Gothic, sans-serif';
+  ctx.textBaseline = 'top';
+
+  let y = 12;
+  const left = 12 + Math.max(0, getEnvNumber('NEXT_PUBLIC_LEFT_MARGIN_DOTS', 0));
+  for (const line of lines) {
+    ctx.fillText(line, left, y);
+    y += lineHeight;
+    if (y > height - lineHeight) break;
+  }
+
+  return canvas.toDataURL('image/png');
+}
+
+function wrapText(text: string, maxCharsPerLine: number): string[] {
+  const words = String(text).split(/\s+/);
+  const lines: string[] = [];
+  let line = '';
+  for (const w of words) {
+    const candidate = line ? `${line} ${w}` : w;
+    if (candidate.length > maxCharsPerLine) {
+      if (line) lines.push(line);
+      if (w.length > maxCharsPerLine) {
+        for (let i = 0; i < w.length; i += maxCharsPerLine) {
+          lines.push(w.slice(i, i + maxCharsPerLine));
+        }
+        line = '';
+      } else {
+        line = w;
+      }
+    } else {
+      line = candidate;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
 }
 
 function applyGammaAndLevels(gray: number, gamma = 1.8, contrast = 1.0, brightness = 0): number {

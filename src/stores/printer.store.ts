@@ -467,7 +467,12 @@ export const usePrinterStore = create<PrinterStore>((set, get) => ({
 
         const payload = await buildPayload(jobToProcess);
         const isImage = jobToProcess.type === "image";
-        await writeInChunks(writeCharacteristic, payload, 20, isImage ? 15 : 5);
+        const envChunk = Number(process.env.NEXT_PUBLIC_PRINT_CHUNK_SIZE);
+        const envDelay = Number(process.env.NEXT_PUBLIC_PRINT_DELAY_MS);
+        const chunkSize = Number.isFinite(envChunk) && envChunk > 0 ? Math.round(envChunk) : 20;
+        const defaultDelay = isImage ? 15 : 5;
+        const delayMs = Number.isFinite(envDelay) && envDelay >= 0 ? Math.round(envDelay) : defaultDelay;
+        await writeInChunks(writeCharacteristic, payload, chunkSize, delayMs);
         // ACK가 가능한 디바이스라면 알림을 기다렸다가 완료 처리
         await awaitAckOrDelay(notifyCharacteristic, isImage ? 1000 : 700);
 
