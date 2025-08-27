@@ -111,8 +111,8 @@ export default function ComposePage() {
   };
   const renderTextToDataUrl = async (text: string): Promise<string> => {
     const width = Math.max(64, PRINTER_SAFE_WIDTH);
-    const lineHeight = 56;
-    const lines = wrapText(text, 9);
+    const lineHeight = 48;
+    const lines = wrapText(text, 12);
     const height = Math.max(64, Math.min(2000, lines.length * lineHeight + 24));
     const canvas = document.createElement("canvas");
     canvas.width = width;
@@ -122,10 +122,10 @@ export default function ComposePage() {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, width, height);
     ctx.fillStyle = "#000000";
-    ctx.font = "bold 40px system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, Apple SD Gothic Neo, Malgun Gothic, sans-serif";
+    ctx.font = "bold 32px system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, Apple SD Gothic Neo, Malgun Gothic, sans-serif";
     ctx.textBaseline = "top";
     let y = 12;
-    const left = 12 + Math.max(0, getEnvNumber("NEXT_PUBLIC_LEFT_MARGIN_DOTS", 0));
+    const left = 6 + Math.max(0, getEnvNumber("NEXT_PUBLIC_LEFT_MARGIN_DOTS", 0));
     for (const line of lines) {
       ctx.fillText(line, left, y);
       y += lineHeight;
@@ -140,9 +140,9 @@ export default function ComposePage() {
     const img = await loadImage(photoUrl);
     const ratio = contentWidth / img.width;
     const imageHeight = Math.max(1, Math.round(img.height * ratio));
-    const lineHeight = 56;
+    const lineHeight = 48;
     const gap = 14;
-    const lines = wrapText(text, 9);
+    const lines = wrapText(text, 12);
     const textHeight = Math.max(0, lines.length * lineHeight + 12);
     const height = Math.min(6000, imageHeight + (lines.length > 0 ? gap + textHeight : 0));
     const canvas = document.createElement("canvas");
@@ -157,11 +157,11 @@ export default function ComposePage() {
     ctx.drawImage(img, 0, 0, img.width, img.height, left, 0, contentWidth, imageHeight);
     if (lines.length > 0) {
       ctx.fillStyle = "#000000";
-      ctx.font = "bold 40px system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, Apple SD Gothic Neo, Malgun Gothic, sans-serif";
+      ctx.font = "bold 32px system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, Apple SD Gothic Neo, Malgun Gothic, sans-serif";
       ctx.textBaseline = "top";
       let y = imageHeight + gap;
       for (const line of lines) {
-        ctx.fillText(line, left + 12, y);
+        ctx.fillText(line, left + 6, y);
         y += lineHeight;
         if (y > height - lineHeight) break;
       }
