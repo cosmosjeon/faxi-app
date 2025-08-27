@@ -212,6 +212,8 @@ export function useBlePrinter() {
     hasError: store.status === "error",
     simulateConnection: store.simulatePrinterConnection,
     simulatePrintComplete: store.simulatePrintComplete,
+    initFromRememberedDevices: store.initFromRememberedDevices,
+    setAutoReconnectEnabled: store.setAutoReconnectEnabled,
   };
 }
 

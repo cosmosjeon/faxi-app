@@ -7,9 +7,12 @@ export default function PrinterCheck() {
   const printer = useBlePrinter();
 
   useEffect(() => {
-    // 프린터 연결 상태 확인 (백그라운드에서)
-    console.log("Printer connection status:", printer.isConnected);
-  }, [printer.isConnected]);
+    // 앱 진입 시 1회 자동 재연결 시도
+    const enabled = typeof window !== 'undefined' ? localStorage.getItem('faxi:autoReconnect') !== 'false' : true;
+    if (enabled && typeof (printer as any).initFromRememberedDevices === 'function') {
+      (printer as any).initFromRememberedDevices();
+    }
+  }, []);
 
   return null;
 }

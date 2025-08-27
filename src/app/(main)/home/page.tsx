@@ -404,6 +404,61 @@ export default function HomePage() {
 
 
 
+  // 자동 출력 처리 (실시간 수신용): approved 즉시 프린트
+  const handleAutoPrintForMessage = useCallback(
+    async (messageId: string) => {
+      try {
+        // 연결/온라인 가드
+        if (printer.status !== "connected") return;
+        if (typeof navigator !== "undefined" && !navigator.onLine) return;
+        if (processingMessages.has(messageId)) return;
+
+        setProcessingMessages((prev) => new Set(prev).add(messageId));
+
+        const full = await getMessageById(messageId);
+        if (!full) {
+          throw new Error("메시지 상세 정보를 불러오지 못했습니다.");
+        }
+
+        await printer.printMessage({
+          text: full.content || undefined,
+          imageUrl: full.image_url || undefined,
+          lcdTeaser: full.lcd_teaser || undefined,
+          senderName: full.sender_profile.display_name,
+        });
+
+        await updateMessagePrintStatus(messageId, "completed");
+
+        // UI에서 제거(이미 목록에 있을 경우)
+        setMessages((prev) => prev.filter((m) => m.id !== messageId));
+
+        toast({
+          title: "프린트 시작",
+          description: `${full.sender_profile.display_name}님의 메시지를 출력합니다.`,
+        });
+      } catch (error) {
+        console.error("자동 프린트 실패:", error);
+        try {
+          await updateMessagePrintStatus(messageId, "pending");
+        } catch (revertError) {
+          console.error("자동 프린트 실패 후 상태 복구 실패:", revertError);
+        }
+        toast({
+          title: "프린트 실패",
+          description: "프린트 중 오류가 발생했습니다. 다시 시도해주세요.",
+          variant: "destructive",
+        });
+      } finally {
+        setProcessingMessages((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(messageId);
+          return newSet;
+        });
+      }
+    },
+    [printer.status, processingMessages]
+  );
+
   // Supabase Realtime 구독
   useEffect(() => {
     if (!profile) return; // 개발 모드에서는 Realtime 구독 안 함
@@ -435,6 +490,19 @@ export default function HomePage() {
             // payload에서 새 메시지 정보 추출하여 처리
             if (process.env.NODE_ENV !== 'production') {
               console.log("새 메시지 처리:", payload.new);
+            }
+
+            // 자동 출력 트리거: 친한친구 자동승인(approved) + 프린터 연결 + 온라인
+            const newMessage: any = payload?.new || {};
+            if (newMessage?.print_status === "approved") {
+              await handleAutoPrintForMessage(newMessage.id);
+            } else if (
+              newMessage?.print_status === "queued" &&
+              printer.status === "connected" &&
+              (typeof navigator === "undefined" || navigator.onLine)
+            ) {
+              // 예외적으로 queued가 새로 들어오는 경우 즉시 처리
+              await handleMessageAction(newMessage.id, "approve", true);
             }
           } catch (error) {
             console.error("Realtime 메시지 처리 실패:", error);

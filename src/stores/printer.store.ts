@@ -14,6 +14,7 @@ declare global {
         optionalServices?: string[];
         acceptAllDevices?: boolean;
       }): Promise<BluetoothDevice>;
+      getDevices?: () => Promise<BluetoothDevice[]>;
     };
   }
 }
@@ -130,6 +131,8 @@ interface PrinterStore {
   isSupported: boolean;
   error: string | null;
   printQueue: PrintJob[];
+  autoReconnectEnabled: boolean;
+  lastDeviceId: string | null;
 
   // BLE 연결 상태 (런타임 리소스)
   device: BluetoothDevice | null;
@@ -144,6 +147,8 @@ interface PrinterStore {
 
   // 액션
   checkBleSupport: () => void;
+  setAutoReconnectEnabled: (enabled: boolean) => void;
+  initFromRememberedDevices: () => Promise<void>;
   connectPrinter: (retryCount?: number) => Promise<void>;
   selectMockDevice: (device: MockDevice) => void;
   cancelDeviceSelection: () => void;
@@ -171,6 +176,12 @@ export const usePrinterStore = create<PrinterStore>((set, get) => ({
   isDevelopmentMode: process.env.NODE_ENV === "development",
   showDeviceSelection: false,
   availableDevices: MOCK_DEVICES,
+  autoReconnectEnabled: typeof window !== "undefined"
+    ? (localStorage.getItem("faxi:autoReconnect") !== "false")
+    : true,
+  lastDeviceId: typeof window !== "undefined"
+    ? localStorage.getItem("faxi:lastPrinterId")
+    : null,
 
   // BLE 지원 여부 확인
   checkBleSupport: () => {
@@ -185,6 +196,47 @@ export const usePrinterStore = create<PrinterStore>((set, get) => ({
           "Web Bluetooth API가 지원되지 않습니다. Chrome 브라우저를 사용해주세요.",
         status: "error",
       });
+    }
+  },
+
+  setAutoReconnectEnabled: (enabled: boolean) => {
+    set({ autoReconnectEnabled: enabled });
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("faxi:autoReconnect", String(enabled));
+      }
+    } catch {}
+  },
+
+  initFromRememberedDevices: async () => {
+    const { isDevelopmentMode, isSupported, status, autoReconnectEnabled, lastDeviceId } = get();
+    if (isDevelopmentMode || !autoReconnectEnabled) return;
+    if (!isSupported || status !== "disconnected") return;
+
+    const bt = (navigator as any).bluetooth;
+    if (!bt || typeof bt.getDevices !== "function") return;
+
+    try {
+      const devices: BluetoothDevice[] = await bt.getDevices();
+      if (!devices || devices.length === 0) return;
+
+      const target = (lastDeviceId ? devices.find(d => d.id === lastDeviceId) : undefined) || devices[0];
+      if (!target) return;
+
+      set({ status: "connecting", error: null });
+
+      const server = await target.gatt?.connect();
+      if (!server) throw new Error("GATT 서버 연결 실패");
+
+      const { writeChar, notifyChar } = await discoverCharacteristics(server);
+
+      target.addEventListener("gattserverdisconnected", () => {
+        handleDisconnectedWithRetry(target);
+      });
+
+      await completeConnection(target, server, writeChar, notifyChar);
+    } catch (e) {
+      set({ status: "disconnected" });
     }
   },
 
@@ -273,6 +325,7 @@ export const usePrinterStore = create<PrinterStore>((set, get) => ({
           writeCharacteristic: null,
           notifyCharacteristic: null,
         });
+        handleDisconnectedWithRetry(device);
       });
 
       const printerInfo: PrinterInfo = {
@@ -288,7 +341,17 @@ export const usePrinterStore = create<PrinterStore>((set, get) => ({
         gattServer: server,
         writeCharacteristic: writeChar,
         notifyCharacteristic: notifyChar,
+        lastDeviceId: device.id,
       });
+
+      try {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("faxi:lastPrinterId", device.id);
+          if (localStorage.getItem("faxi:autoReconnect") == null) {
+            localStorage.setItem("faxi:autoReconnect", "true");
+          }
+        }
+      } catch {}
 
       printerToasts.connectSuccess(printerInfo.name);
       logger.info("🖨️ 프린터 연결 완료:", printerInfo);
@@ -562,6 +625,85 @@ export const usePrinterStore = create<PrinterStore>((set, get) => ({
     }));
   },
 }));
+
+// 공통: 캐릭터리스틱 탐색 로직 분리
+async function discoverCharacteristics(server: BluetoothRemoteGATTServer): Promise<{ writeChar: BluetoothRemoteGATTCharacteristic; notifyChar: BluetoothRemoteGATTCharacteristic | null; }> {
+  let writeChar: BluetoothRemoteGATTCharacteristic | null = null;
+  let notifyChar: BluetoothRemoteGATTCharacteristic | null = null;
+  for (const profile of MPT_PROFILES) {
+    try {
+      const svc = await server.getPrimaryService(profile.service);
+      if (profile.notify) {
+        for (const n of profile.notify) {
+          try {
+            const nChar = await svc.getCharacteristic(n);
+            await nChar.startNotifications().catch(() => undefined);
+            notifyChar = nChar;
+            break;
+          } catch {}
+        }
+      }
+      for (const w of profile.write) {
+        try {
+          writeChar = await svc.getCharacteristic(w);
+          break;
+        } catch {}
+      }
+      if (writeChar) break;
+    } catch {}
+  }
+  if (!writeChar) throw new Error("지원되는 쓰기 채널을 찾지 못했습니다.");
+  return { writeChar, notifyChar };
+}
+
+// 공통: 연결 완료 상태 반영
+async function completeConnection(device: BluetoothDevice, server: BluetoothRemoteGATTServer, writeChar: BluetoothRemoteGATTCharacteristic, notifyChar: BluetoothRemoteGATTCharacteristic | null) {
+  const printerInfo: PrinterInfo = {
+    id: device.id,
+    name: device.name || "Unknown Printer",
+  };
+  usePrinterStore.setState({
+    status: "connected",
+    connectedPrinter: printerInfo,
+    error: null,
+    device,
+    gattServer: server,
+    writeCharacteristic: writeChar,
+    notifyCharacteristic: notifyChar,
+    lastDeviceId: device.id,
+  });
+  try {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("faxi:lastPrinterId", device.id);
+    }
+  } catch {}
+  printerToasts.connectSuccess(printerInfo.name);
+}
+
+// 공통: 끊김 후 재연결 백오프
+function handleDisconnectedWithRetry(device: BluetoothDevice) {
+  const { autoReconnectEnabled } = usePrinterStore.getState();
+  if (!autoReconnectEnabled) return;
+  let attempt = 0;
+  const max = 3;
+  const retry = async () => {
+    attempt += 1;
+    try {
+      usePrinterStore.setState({ status: "connecting" });
+      const server = await device.gatt?.connect();
+      if (!server) throw new Error("GATT 서버 연결 실패");
+      const { writeChar, notifyChar } = await discoverCharacteristics(server);
+      await completeConnection(device, server, writeChar, notifyChar);
+    } catch {
+      if (attempt < max) {
+        setTimeout(retry, 1000 * attempt);
+      } else {
+        usePrinterStore.setState({ status: "disconnected" });
+      }
+    }
+  };
+  retry();
+}
 
 // 텍스트 → ESC/POS 바이트 (ASCII 안전)
 function composeEscPosTextBytes(text: string): Uint8Array {
