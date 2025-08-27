@@ -298,8 +298,8 @@ export default function PrinterPage() {
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-md mx-auto space-y-4">
         {/* 헤더 */}
-        <div className="bg-white rounded-lg p-4 shadow-sm">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+        <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+          <h1 className="text-xl font-semibold text-gray-900 leading-tight mb-1">
             프린터 관리 🖨️
           </h1>
           <p className="text-gray-600">BLE 프린터를 연결하고 관리하세요</p>

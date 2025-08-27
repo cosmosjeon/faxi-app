@@ -50,7 +50,7 @@ export function BottomTabBar() {
 
   return (
     // 네비게이션 컨테이너 - 화면 하단에 고정
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 pt-2 pb-[calc(8px+env(safe-area-inset-bottom,0px))]">
       {/* 탭들을 감싸는 컨테이너 - 중앙 정렬, 최대 너비 제한 */}
       <div className="flex items-center justify-around max-w-md mx-auto">
         {/* 각 탭을 순회하며 렌더링 */}

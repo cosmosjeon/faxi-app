@@ -131,7 +131,7 @@ export default function AddFriendPage() {
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-md mx-auto space-y-4">
         {/* 헤더 */}
-        <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center gap-2 mb-4">
           <Button
             variant="ghost"
             size="sm"
@@ -141,8 +141,8 @@ export default function AddFriendPage() {
             <ArrowLeft size={20} />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">친구 추가</h1>
-            <p className="text-gray-600">ID로 친구를 찾아보세요</p>
+            <h1 className="text-xl font-semibold text-gray-900 leading-tight">친구 추가</h1>
+            <p className="text-gray-600 text-sm mt-0.5">ID로 친구를 찾아보세요</p>
           </div>
         </div>
 

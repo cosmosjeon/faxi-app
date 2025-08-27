@@ -490,7 +490,7 @@ export default function ComposePage() {
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-md mx-auto space-y-4">
         {/* 헤더 */}
-        <div className="bg-white rounded-lg p-4 shadow-sm flex items-center gap-3">
+        <div className="bg-white rounded-lg px-4 py-3 shadow-sm flex items-center gap-2">
           <Button
             variant="ghost"
             size="sm"
@@ -502,10 +502,10 @@ export default function ComposePage() {
             <ArrowLeft size={20} />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-xl font-semibold text-gray-900 leading-tight">
               {editMode === "imageEdit" ? "이미지 편집" : "메시지 전송"}
             </h1>
-            <p className="text-gray-600 mt-1">
+            <p className="text-gray-600 mt-0.5">
               {editMode === "imageEdit"
                 ? "사진을 크롭하고 저장하세요"
                 : "친구에게 특별한 메시지를 보내보세요"}

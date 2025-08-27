@@ -49,9 +49,9 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-md mx-auto space-y-4">
         {/* 헤더 */}
-        <div className="bg-white rounded-lg p-4 shadow-sm">
-          <h1 className="text-2xl font-bold text-gray-900">프로필</h1>
-          <p className="text-gray-600 mt-1">계정 정보와 설정을 관리하세요</p>
+        <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+          <h1 className="text-xl font-semibold text-gray-900 leading-tight">프로필</h1>
+          <p className="text-gray-600 mt-0.5">계정 정보와 설정을 관리하세요</p>
         </div>
 
         {/* 프로필 정보 */}

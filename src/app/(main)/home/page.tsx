@@ -820,13 +820,13 @@ export default function HomePage() {
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-md mx-auto space-y-4">
         {/* 헤더 */}
-        <div className="bg-white rounded-lg p-4 shadow-sm">
+        <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-xl font-semibold text-gray-900 leading-tight">
                 안녕하세요, {profile?.display_name || "사용자"}님! 👋
               </h1>
-              <p className="text-gray-600 mt-1">
+              <p className="text-gray-600 mt-0.5">
                 {pendingCount > 0
                   ? `${pendingCount}개의 새로운 메시지가 있습니다`
                   : "새로운 메시지를 확인해보세요"}

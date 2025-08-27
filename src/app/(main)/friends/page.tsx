@@ -604,7 +604,7 @@ export default function FriendsPage() {
             <button
               onClick={() => handleCancelCloseFriendRequest(friend.friend_id)}
               disabled={isUpdating}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-orange-700 hover:bg-orange-100 rounded-md transition-colors duration-200"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-orange-700 hover:bg-orange-100 rounded-md transition-colors duration-200 whitespace-nowrap"
             >
               <X size={14} />
               신청 취소
@@ -617,7 +617,7 @@ export default function FriendsPage() {
               <button
                 onClick={() => handleSendCloseFriendRequest(friend.friend_id)}
                 disabled={isUpdating}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors duration-200 border ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors duration-200 border whitespace-nowrap ${
                   isUpdating
                     ? "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
                     : "border-gray-200 text-gray-700 hover:bg-gray-100"
@@ -647,9 +647,9 @@ export default function FriendsPage() {
 
     return (
       <div
-        className={`flex items-center justify-between p-3 rounded-lg border ${config.borderColor} ${config.bgColor} hover:shadow-sm transition-shadow duration-200`}
+        className={`flex items-center justify-between p-3 gap-3 rounded-lg border ${config.borderColor} ${config.bgColor} hover:shadow-sm transition-shadow duration-200`}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
             <Avatar className="h-12 w-12">
             <AvatarImage
               src={friend.friend_profile?.avatar_url || ""}
@@ -660,15 +660,15 @@ export default function FriendsPage() {
             </AvatarFallback>
           </Avatar>
 
-          <div>
-            <h3 className="font-medium text-gray-900">
+          <div className="min-w-0">
+            <h3 className="font-medium text-gray-900 truncate">
               {friend.friend_profile.display_name}
             </h3>
-            <p className="text-sm text-gray-600">@{friend.friend_profile.username}</p>
+            <p className="text-sm text-gray-600 truncate">@{friend.friend_profile.username}</p>
             {config.statusText && (
               <div className="flex items-center gap-1 mt-1">
                 {config.icon}
-                <span className={`text-xs ${config.statusColor}`}>
+                <span className={`text-xs ${config.statusColor} whitespace-nowrap`}>
                   {config.statusText}
                 </span>
               </div>
@@ -676,7 +676,7 @@ export default function FriendsPage() {
           </div>
         </div>
 
-        {renderActionButtons()}
+        <div className="shrink-0 flex items-center gap-2">{renderActionButtons()}</div>
       </div>
     );
   };
@@ -727,10 +727,10 @@ export default function FriendsPage() {
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-md mx-auto space-y-4">
         {/* 헤더 */}
-        <div className="bg-white rounded-lg p-4 shadow-sm flex items-center justify-between">
+        <div className="bg-white rounded-lg px-4 py-3 shadow-sm flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">친구 목록</h1>
-            <p className="text-gray-600 mt-1">
+            <h1 className="text-xl font-semibold text-gray-900 leading-tight">친구 목록</h1>
+            <p className="text-gray-600 mt-0.5">
               총 {acceptedCount}명 · 친한친구 {closeFriendsCount}명
               {closeFriendRequestsCount > 0 &&
                 ` · 친한친구 신청 ${closeFriendRequestsCount}개`}

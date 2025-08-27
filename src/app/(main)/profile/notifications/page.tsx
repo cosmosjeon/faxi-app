@@ -423,8 +423,8 @@ export default function NotificationSettingsPage() {
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-md mx-auto space-y-4">
         {/* 헤더 */}
-        <div className="bg-white rounded-lg p-4 shadow-sm">
-          <div className="flex items-center gap-3">
+        <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+          <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="sm"
@@ -434,8 +434,8 @@ export default function NotificationSettingsPage() {
               <ArrowLeft size={20} />
             </Button>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">알림 설정</h1>
-              <p className="text-sm text-gray-600">
+              <h1 className="text-xl font-semibold text-gray-900 leading-tight">알림 설정</h1>
+              <p className="text-sm text-gray-600 mt-0.5">
                 알림 수신 방식을 설정하세요
               </p>
             </div>

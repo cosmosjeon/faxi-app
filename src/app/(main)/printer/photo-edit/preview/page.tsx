@@ -180,7 +180,7 @@ export default function PhotoPreviewPage() {
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-md mx-auto space-y-4">
         {/* 헤더 */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Button
             variant="ghost"
             size="sm"
@@ -190,8 +190,8 @@ export default function PhotoPreviewPage() {
             <ArrowLeft size={20} />
           </Button>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">프린트 미리보기</h1>
-            <p className="text-sm text-gray-600">최종 출력물을 확인하세요</p>
+            <h1 className="text-xl font-semibold text-gray-900 leading-tight">프린트 미리보기</h1>
+            <p className="text-sm text-gray-600 mt-0.5">최종 출력물을 확인하세요</p>
           </div>
         </div>
 
