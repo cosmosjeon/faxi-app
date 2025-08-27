@@ -1,5 +1,16 @@
 'use strict';
 
+// Release: mute dev logs in Service Worker (keep errors only)
+(function(){
+  try {
+    /* eslint-disable no-console */
+    console.log = function(){};
+    console.info = function(){};
+    console.warn = function(){};
+    /* eslint-enable no-console */
+  } catch (_) {}
+})();
+
 try {
   console.log('[SW] Service Worker 초기화 시작');
 

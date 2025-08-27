@@ -6,7 +6,6 @@ import {
   type MockDevice,
 } from "@/stores/printer.store";
 import { toast } from "@/hooks/use-toast";
-import { printerToasts } from "@/lib/toasts";
 import { logger } from "@/features/utils";
 
 // 프린터 설정 (안전 인쇄 모드)
@@ -34,19 +33,12 @@ export function useBlePrinter() {
     store.checkBleSupport();
   }, [store.checkBleSupport]);
 
-  // 연결 상태 알림
+  // 연결 상태 알림: 연결됨/해제됨은 간단한 토스트, 에러는 파괴적 토스트
   useEffect(() => {
     if (store.status === "connected" && store.connectedPrinter) {
-      toast({
-        title: "프린터 연결됨",
-        description: `${store.connectedPrinter.name}이(가) 연결되었습니다.`,
-      });
+      toast({ title: "프린터 연결됨", description: `${store.connectedPrinter.name}`, });
     } else if (store.status === "error" && store.error) {
-      toast({
-        title: "프린터 연결 실패",
-        description: store.error,
-        variant: "destructive",
-      });
+      toast({ title: "프린터 연결 실패", description: store.error, variant: "destructive" });
     }
   }, [store.status, store.connectedPrinter, store.error]);
 
@@ -77,7 +69,7 @@ export function useBlePrinter() {
       const imageBytes = await convertImageToEscPosRaster(dataUrl, invert);
       const buf = imageBytes.buffer.slice(imageBytes.byteOffset, imageBytes.byteOffset + imageBytes.byteLength);
       const jobId = store.addPrintJob("image", buf);
-      toast({ title: "프린트 시작", description: `${messageData.senderName}님의 메시지를 출력합니다.` });
+      toast({ title: "프린트 시작" });
       return jobId;
     }
 
@@ -97,7 +89,7 @@ export function useBlePrinter() {
       const imageBytes = await convertImageToEscPosRaster(messageData.imageUrl, invert);
       const buf = imageBytes.buffer.slice(imageBytes.byteOffset, imageBytes.byteOffset + imageBytes.byteLength);
       const jobId = store.addPrintJob("image", buf);
-      toast({ title: "프린트 시작", description: `${messageData.senderName}님의 메시지를 출력합니다.` });
+      toast({ title: "프린트 시작" });
       return jobId;
     }
 
@@ -118,7 +110,7 @@ export function useBlePrinter() {
       const imageBytes = await convertImageToEscPosRaster(dataUrl, invert);
       const buf = imageBytes.buffer.slice(imageBytes.byteOffset, imageBytes.byteOffset + imageBytes.byteLength);
       const jobId = store.addPrintJob("image", buf);
-      toast({ title: "프린트 시작", description: `${messageData.senderName}님의 메시지를 출력합니다.` });
+      toast({ title: "프린트 시작" });
       return jobId;
     }
 
@@ -137,12 +129,12 @@ export function useBlePrinter() {
       const imageBytes = await convertImageToEscPosRaster(dataUrl, invert);
       const buf = imageBytes.buffer.slice(imageBytes.byteOffset, imageBytes.byteOffset + imageBytes.byteLength);
       const jobId = store.addPrintJob("image", buf);
-      toast({ title: "텍스트 프린트", description: "텍스트를 이미지로 변환하여 출력합니다." });
+      toast({ title: "프린트 시작" });
       return jobId;
     }
 
     const jobId = store.addPrintJob("text", text);
-    toast({ title: "텍스트 프린트", description: "텍스트를 출력합니다." });
+    toast({ title: "프린트 시작" });
     return jobId;
   };
 
@@ -164,10 +156,8 @@ export function useBlePrinter() {
       const imageBytes = await convertImageToEscPosRaster(imageUrl, invert);
       const buf = imageBytes.buffer.slice(imageBytes.byteOffset, imageBytes.byteOffset + imageBytes.byteLength);
       const jobId = store.addPrintJob("image", buf);
-      printerToasts.printStarted();
       return jobId;
     } catch (error) {
-      printerToasts.printError();
       throw error;
     }
   };
@@ -176,7 +166,7 @@ export function useBlePrinter() {
     try { await store.connectPrinter(); } catch (error) { logger.error("프린터 연결 실패:", error); }
   };
   const disconnectWithFeedback = async (): Promise<void> => {
-    try { await store.disconnectPrinter(); printerToasts.disconnectSuccess(); } catch (error) { logger.error("프린터 연결 해제 실패:", error); }
+    try { await store.disconnectPrinter(); } catch (error) { logger.error("프린터 연결 해제 실패:", error); }
   };
 
   const getQueueStatus = () => {

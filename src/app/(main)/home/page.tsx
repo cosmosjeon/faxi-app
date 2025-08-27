@@ -364,10 +364,7 @@ export default function HomePage() {
         console.log("🖨️ 프린터 연결됨 - 즉시 프린트 실행");
       }
       await handleMessageAction(message.id, "approve", true);
-      toast({
-        title: "친한 친구의 메시지",
-        description: `${message.sender_profile.display_name}님의 메시지가 자동으로 프린트됩니다.`,
-      });
+      toast({ title: "자동 프린트" });
     } else {
       // 프린터 연결 안됨: 대기 상태로 설정
       if (process.env.NODE_ENV !== 'production') {
@@ -392,10 +389,7 @@ export default function HomePage() {
           console.log("✅ UI 상태 업데이트 완료:", message.id);
         }
 
-        toast({
-          title: "친한 친구의 메시지 대기 중",
-          description: `${message.sender_profile.display_name}님의 메시지가 프린터 연결을 기다립니다.`,
-        });
+        toast({ title: "대기열에 등록됨" });
       } catch (error) {
         console.error("❌ 메시지 queued 상태 저장 실패:", error);
       }
@@ -432,10 +426,7 @@ export default function HomePage() {
         // UI에서 제거(이미 목록에 있을 경우)
         setMessages((prev) => prev.filter((m) => m.id !== messageId));
 
-        toast({
-          title: "프린트 시작",
-          description: `${full.sender_profile.display_name}님의 메시지를 출력합니다.`,
-        });
+        toast({ title: "프린트 시작" });
       } catch (error) {
         console.error("자동 프린트 실패:", error);
         try {

@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/components/auth-provider";
 import { RealtimeProvider } from "@/components/RealtimeProvider";
 import { PushNotificationInitializer } from "@/components/PushNotificationInitializer";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // QueryClient 기본 설정
 const queryClientOptions = {
@@ -22,6 +22,16 @@ const queryClientOptions = {
 export default function Providers({ children }: { children: React.ReactNode }) {
   // 클라이언트 사이드에서만 QueryClient 생성하여 SSR 이슈 방지
   const [queryClient] = useState(() => new QueryClient(queryClientOptions));
+
+  // 프로덕션에서 개발용 콘솔 로그 무음 처리 (error는 유지)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+      const c = window.console as Console & { log: any; info: any; warn: any };
+      c.log = () => {};
+      c.info = () => {};
+      c.warn = () => {};
+    }
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
