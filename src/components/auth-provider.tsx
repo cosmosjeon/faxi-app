@@ -39,6 +39,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true; // cleanup 플래그 추가
+    
     const initializeAuth = async () => {
       try {
         // 🔄 세션 확인 - 페이지 새로고침 시에도 안정적으로 세션 복원
@@ -64,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        if (session && session.user) {
+        if (isMounted && session && session.user) {
           if (process.env.NODE_ENV !== 'production') {
             console.log("✅ 세션 복원 성공:", session.user.id);
           }
@@ -75,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           fetchProfile().catch((profileError) => {
             console.warn("프로필 조회 실패 (세션은 유지):", profileError);
           });
-        } else {
+        } else if (isMounted) {
           if (process.env.NODE_ENV !== 'production') {
             console.log("세션 없음, 초기 상태 설정");
           }
@@ -83,12 +85,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         console.error("인증 초기화 실패:", error);
-        reset();
+        if (isMounted) reset();
       } finally {
-        setLoading(false);
-        setInitialized(true);
-        setIsLoading(false);
-        setIsInitialized(true);
+        if (isMounted) {
+          setLoading(false);
+          setInitialized(true);
+          setIsLoading(false);
+          setIsInitialized(true);
+        }
       }
     };
 
@@ -106,26 +110,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         event === "SIGNED_OUT" ||
         event === "TOKEN_REFRESHED"
       ) {
-        setSession(session);
-        setUser(session?.user ?? null);
+        if (isMounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
 
-        if (session?.user) {
-          // 프로필 조회는 백그라운드에서 처리
-          fetchProfile().catch((error) => {
-            console.warn("프로필 조회 실패 (세션은 유지):", error);
-          });
-        } else {
-          reset();
+          if (session?.user) {
+            // 프로필 조회는 백그라운드에서 처리
+            fetchProfile().catch((error) => {
+              console.warn("프로필 조회 실패 (세션은 유지):", error);
+            });
+          } else {
+            reset();
+          }
+
+          setLoading(false);
+          setIsLoading(false);
         }
-
-        setLoading(false);
-        setIsLoading(false);
       }
     });
 
     initializeAuth();
 
     return () => {
+      isMounted = false; // cleanup 플래그 설정
       subscription.unsubscribe();
     };
   }, [setUser, setSession, setLoading, setInitialized, fetchProfile, reset]);

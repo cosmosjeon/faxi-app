@@ -34,12 +34,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuthStore } from "@/stores/auth.store";
 import {
-  getMessagesList,
+  getReceivedMessagePreviews,
+  getMessageById,
   updateMessagePrintStatus,
   getQueuedMessages,
 } from "@/features/messages/api";
 import { areCloseFriends } from "@/features/friends/api";
-import type { MessageWithProfiles } from "@/features/messages/types";
+import type { MessageWithProfiles, MessagePreview } from "@/features/messages/types";
 import { supabase } from "@/lib/supabase/client";
 import { useBlePrinter } from "@/hooks/useBlePrinter";
 import { toast } from "@/hooks/use-toast";
@@ -62,7 +63,7 @@ export default function HomePage() {
       });
     }
   }, [printer.status, printer.isConnected, printer.connectedPrinter]);
-  const [messages, setMessages] = useState<MessageWithProfiles[]>([]);
+  const [messages, setMessages] = useState<(MessagePreview | MessageWithProfiles)[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processingMessages, setProcessingMessages] = useState<Set<string>>(
     new Set()
@@ -75,7 +76,7 @@ export default function HomePage() {
   // 확인 팝업 관련 상태
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
-    message: MessageWithProfiles | null;
+    message: MessagePreview | MessageWithProfiles | null;
   }>({
     isOpen: false,
     message: null,
@@ -110,13 +111,8 @@ export default function HomePage() {
       }
 
       try {
-        const messagesList = await getMessagesList(profile.id);
-        const pendingReceivedMessages = messagesList.filter(
-          (msg) =>
-            msg.receiver_id === profile.id &&
-            (msg.print_status === "pending" || msg.print_status === "queued")
-        );
-        setMessages(pendingReceivedMessages);
+        const previews = await getReceivedMessagePreviews(profile.id);
+        setMessages(previews);
       } catch (error) {
         console.error("실시간 메시지 동기화 실패:", error);
       }
@@ -130,7 +126,7 @@ export default function HomePage() {
 
     setIsLoading(true);
     try {
-      const messagesList = await getMessagesList(profile.id);
+      const messagesList = await getReceivedMessagePreviews(profile.id);
 
       if (process.env.NODE_ENV !== 'production') {
         console.log("📋 전체 메시지 목록 로드:", {
@@ -159,7 +155,7 @@ export default function HomePage() {
         count: receivedMessages.length,
         messages: receivedMessages.map((m) => ({
           id: m.id,
-          sender: m.sender_profile.display_name,
+          sender: (m as any).sender_profile.display_name,
           print_status: m.print_status,
           created_at: m.created_at,
         })),
@@ -352,7 +348,7 @@ export default function HomePage() {
   }, [profile, printer.status]);
 
   // 친한친구 메시지 처리 함수
-  const handleCloseFriendMessage = async (message: MessageWithProfiles) => {
+  const handleCloseFriendMessage = async (message: MessagePreview | MessageWithProfiles) => {
     if (process.env.NODE_ENV !== 'production') {
       console.log("💖 친한친구 메시지 처리 시작:", {
         message_id: message.id,
@@ -525,11 +521,16 @@ export default function HomePage() {
       if (action === "approve") {
         // 프린트 승인 시 실제 프린터로 전송
         try {
+          // 상세 데이터 조회 (본문/이미지 안전 로드)
+          const full = await getMessageById(messageId);
+          if (!full) {
+            throw new Error("메시지 상세 정보를 불러오지 못했습니다.");
+          }
           await printer.printMessage({
-            text: messageToProcess.content || undefined,
-            imageUrl: messageToProcess.image_url || undefined,
-            lcdTeaser: messageToProcess.lcd_teaser || undefined,
-            senderName: messageToProcess.sender_profile.display_name,
+            text: full.content || undefined,
+            imageUrl: full.image_url || undefined,
+            lcdTeaser: full.lcd_teaser || undefined,
+            senderName: full.sender_profile.display_name,
           });
 
           if (process.env.NODE_ENV !== 'production') {
@@ -624,9 +625,9 @@ export default function HomePage() {
     try {
       console.log("📋 대기 중인 메시지 확인 시작");
 
-      // 1단계: 일반 메시지 목록 다시 조회해서 현재 상태 확인
-      console.log("🔄 현재 DB 상태 재확인을 위해 메시지 목록 다시 조회");
-      const currentMessages = await getMessagesList(profile.id);
+      // 1단계: 미리보기 목록 다시 조회해서 현재 상태 확인
+      console.log("🔄 현재 DB 상태 재확인을 위해 미리보기 목록 다시 조회");
+      const currentMessages = await getReceivedMessagePreviews(profile.id);
       const currentReceivedMessages = currentMessages.filter(
         (m) => m.receiver_id === profile.id
       );
@@ -653,7 +654,7 @@ export default function HomePage() {
         },
         detailed_messages: currentReceivedMessages.map((m) => ({
           id: m.id,
-          sender: m.sender_profile.display_name,
+          sender: (m as any).sender_profile.display_name,
           print_status: m.print_status,
           created_at: m.created_at,
         })),
@@ -905,7 +906,8 @@ export default function HomePage() {
                 {messages.map((message) => (
                   <MessageCard
                     key={message.id}
-                    message={message}
+                    message={message as any}
+                    variant="preview"
                     isProcessing={processingMessages.has(message.id)}
                     onAccept={(messageId) =>
                       handleMessageAction(messageId, "approve")

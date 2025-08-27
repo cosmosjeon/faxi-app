@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback, useRef } from "react";
 import { RealtimeChannel } from "@supabase/supabase-js";
+import { connectionManager } from "@/lib/supabase-limits";
 import {
   subscribeToNewMessages,
   subscribeToFriendships,
@@ -116,6 +117,13 @@ export const useRealtime = ({
       return;
     }
 
+    // Supabase 연결 수 제한 확인
+    if (!connectionManager.canConnect()) {
+      logger.warn("⚠️ Realtime 연결 수가 제한에 도달했습니다.");
+      setConnectionStatus("error");
+      return;
+    }
+
     logger.info("🔌 Setting up realtime subscriptions for user:", userId);
     setConnectionStatus("connecting");
 
@@ -134,6 +142,7 @@ export const useRealtime = ({
       ];
 
       subscriptionsRef.current = subscriptions;
+      connectionManager.increment(); // 연결 수 추가
       setConnectionStatus("connected");
 
       logger.info("✅ Realtime subscriptions established");
@@ -165,6 +174,10 @@ export const useRealtime = ({
       }
     });
 
+    if (subscriptionsRef.current.length > 0) {
+      connectionManager.decrement(); // 연결 수 감소
+    }
+    
     subscriptionsRef.current = [];
     setConnectionStatus("disconnected");
   }, [setConnectionStatus]);

@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase/client";
 import { messageToasts, imageToasts } from "@/lib/toasts";
 import { MAX_MESSAGE_LENGTH, MAX_TEASER_LENGTH, MAX_IMAGE_SIZE } from "../constants";
 import { handleApiError, logger } from "../utils";
+import { validateImageSize, usageMonitor } from "@/lib/supabase-limits";
 import { sendNewMessageNotification, sendAutoPrintStatusNotification } from "@/lib/push-notification-service";
 import type {
   Message,
@@ -9,6 +10,7 @@ import type {
   MessageWithProfiles,
   ImageUploadResult,
   MessageFormErrors,
+  MessagePreview,
 } from "./types";
 
 const isDevelopmentMode = process.env.NODE_ENV === "development";
@@ -61,6 +63,10 @@ export async function uploadMessageImage(
   file: File,
   senderId: string
 ): Promise<ImageUploadResult> {
+  // 이미지 크기 검증 (Supabase 제한 고려)
+  validateImageSize(file);
+  usageMonitor.logImageUpload(file.size);
+  
   // Storage가 설정되지 않은 경우 mock URL 반환 (개발 환경 대응)
   try {
     // 고유한 파일 경로 생성
@@ -218,6 +224,8 @@ export async function sendMessage(
   } catch (error) {
     handleApiError("MESSAGE_SEND_FAILED", error);
   }
+  // 타입 안전성을 위한 폴백 (실행 경로상 도달하지 않음)
+  throw new Error("MESSAGE_SEND_FAILED");
 }
 
 /**
@@ -245,6 +253,67 @@ export async function getMessagesList(
   } catch (error) {
     handleApiError("MESSAGE_LIST_FAILED", error);
   }
+  return [];
+}
+
+/**
+ * 받은 메시지 미리보기 전용 조회 (홈 피드)
+ * - content, image_url 제외하여 프라이버시 보장
+ */
+export async function getReceivedMessagePreviews(
+  userId: string
+): Promise<MessagePreview[]> {
+  try {
+    const { data, error } = await supabase
+      .from("messages")
+      .select(
+        `
+        id,
+        sender_id,
+        receiver_id,
+        lcd_teaser,
+        print_status,
+        created_at,
+        sender_profile:sender_id(id, display_name, avatar_url)
+      `
+      )
+      .eq("receiver_id", userId)
+      .in("print_status", ["pending", "queued", "approved"])
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return (data as unknown as MessagePreview[]) || [];
+  } catch (error) {
+    handleApiError("MESSAGE_LIST_FAILED", error);
+  }
+  return [];
+}
+
+/**
+ * 단일 메시지 상세 조회 (프린트 직전 사용)
+ */
+export async function getMessageById(
+  messageId: string
+): Promise<MessageWithProfiles | null> {
+  try {
+    const { data, error } = await supabase
+      .from("messages")
+      .select(
+        `
+        *,
+        sender_profile:sender_id(id, username, display_name, avatar_url),
+        receiver_profile:receiver_id(id, username, display_name, avatar_url)
+      `
+      )
+      .eq("id", messageId)
+      .single();
+
+    if (error) throw error;
+    return (data as unknown as MessageWithProfiles) || null;
+  } catch (error) {
+    handleApiError("MESSAGE_LIST_FAILED", error);
+  }
+  return null;
 }
 
 /**
@@ -274,6 +343,7 @@ export async function updateMessagePrintStatus(
   } catch (error) {
     handleApiError("MESSAGE_STATUS_UPDATE_FAILED", error);
   }
+  return;
 }
 
 /**

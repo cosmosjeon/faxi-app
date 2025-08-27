@@ -60,6 +60,8 @@ export async function searchUserByUsername(
   } catch (error) {
     handleApiError("FRIEND_SEARCH_FAILED", error);
   }
+  // 타입 안정성을 위해 안전한 기본값 반환 (실행 경로상 도달하지 않음)
+  return [];
 }
 
 /**
@@ -131,6 +133,7 @@ export async function getFriendsList(
   } catch (error) {
     handleApiError("FRIEND_LIST_FAILED", error);
   }
+  return [];
 }
 
 /**
@@ -177,6 +180,7 @@ export async function addFriend(
   } catch (error) {
     handleApiError("FRIEND_ADD_FAILED", error);
   }
+  throw new Error("FRIEND_ADD_FAILED");
 }
 
 // ❌ updateCloseFriend 함수 제거됨 (토글 방식 대신 신청-수락 방식 사용)
@@ -196,6 +200,7 @@ export async function removeFriend(friendshipId: string): Promise<void> {
   } catch (error) {
     handleApiError("FRIEND_REMOVE_FAILED", error);
   }
+  return;
 }
 
 /**
@@ -301,6 +306,7 @@ export async function acceptFriendRequest(friendshipId: string): Promise<void> {
     console.error("친구 요청 수락 실패:", error);
     throw new Error("친구 요청을 수락하는데 실패했습니다.");
   }
+  return;
 }
 
 /**
@@ -318,6 +324,7 @@ export async function rejectFriendRequest(friendshipId: string): Promise<void> {
     console.error("친구 요청 거절 실패:", error);
     throw new Error("친구 요청을 거절하는데 실패했습니다.");
   }
+  return;
 }
 
 /**
@@ -495,6 +502,7 @@ export async function acceptCloseFriendRequest(
 
     throw new Error(errorMessage || "친한친구 신청 수락에 실패했습니다.");
   }
+  return;
 }
 
 /**
@@ -514,6 +522,7 @@ export async function rejectCloseFriendRequest(
     console.error("친한친구 신청 거절 실패:", error);
     throw new Error("친한친구 신청 거절에 실패했습니다.");
   }
+  return;
 }
 
 /**
@@ -533,6 +542,7 @@ export async function cancelCloseFriendRequest(
     console.error("친한친구 신청 취소 실패:", error);
     throw new Error("친한친구 신청 취소에 실패했습니다.");
   }
+  return;
 }
 
 /**
@@ -641,6 +651,7 @@ export async function getCloseFriendRequestStatus(
     console.error("친한친구 신청 상태 확인 실패:", error);
     return { status: "none" };
   }
+  return { status: "none" };
 }
 
 /**
@@ -674,6 +685,12 @@ export async function getFriendStats(userId: string) {
       pending_received: 0,
     };
   }
+  return {
+    total_friends: 0,
+    close_friends: 0,
+    pending_sent: 0,
+    pending_received: 0,
+  };
 }
 
 /**
@@ -738,6 +755,7 @@ export async function deleteFriend(
     console.error("친구 삭제 실패:", error);
     throw new Error("친구 삭제에 실패했습니다.");
   }
+  return;
 }
 
 /**
@@ -758,6 +776,7 @@ export async function removeCloseFriend(
     console.error("친한친구 해제 실패:", error);
     throw new Error("친한친구 해제에 실패했습니다.");
   }
+  return;
 }
 
 /**
@@ -786,6 +805,7 @@ export async function checkFriendshipStatus(
     console.error("친구 관계 확인 실패:", error);
     return null;
   }
+  return null;
 }
 
 /**

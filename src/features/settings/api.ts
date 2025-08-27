@@ -113,6 +113,7 @@ export async function getUserSettings(
   } catch (error) {
     handleApiError("SETTINGS_LOAD_FAILED", error);
   }
+  return null;
 }
 
 /**

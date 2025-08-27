@@ -10,13 +10,37 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   
-  // 이미지 설정 - 외부 이미지 도메인 허용
+  // 이미지 설정 - 보안 강화된 외부 도메인 제한
   images: {
     remotePatterns: [
       {
-        hostname: "**", // 모든 도메인 허용 (개발용, 프로덕션에서는 제한 필요)
+        protocol: 'https',
+        hostname: 'tkzfnkuwflexqcurngrr.supabase.co', // Supabase Storage
+        port: '',
+        pathname: '/storage/v1/object/public/**',
       },
+      {
+        protocol: 'https', 
+        hostname: 'picsum.photos', // Mock 이미지 (개발용)
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com', // Google 프로필 이미지
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'k.kakaocdn.net', // Kakao 프로필 이미지  
+        port: '',
+        pathname: '/**',
+      }
     ],
+    formats: ['image/webp', 'image/avif'], // 최적화된 포맷
+    minimumCacheTTL: 60, // 1분 최소 캐시
+    dangerouslyAllowSVG: false, // SVG 보안 차단
   },
   
   // HTTP 헤더 설정 - 보안 및 기능 관련 헤더 추가

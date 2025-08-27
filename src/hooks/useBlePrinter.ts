@@ -60,12 +60,31 @@ export function useBlePrinter() {
       throw new Error("프린터가 연결되지 않았습니다.");
     }
 
-    let lastJobId = "";
-
-    // 1) 이미지가 있으면 먼저 이미지 출력(ESC/POS 래스터)
-    if (messageData.imageUrl) {
+    // 사진 + 텍스트 → 하나의 합성 이미지로 출력(인스타 피드 레이아웃)
+    if (messageData.imageUrl && messageData.text) {
+      const dataUrl = await composeFeedDataUrl(messageData.imageUrl, messageData.text);
       const invert = shouldInvertForPrinter(store.connectedPrinter?.name);
-      debugPrinterConfig('printMessage(image)', {
+      debugPrinterConfig('printMessage(composite)', {
+        deviceName: store.connectedPrinter?.name || '',
+        invertMode: getEnvString('NEXT_PUBLIC_PRINTER_INVERT_MODE'),
+        invertResolved: String(invert),
+        xorInvert: String(getEnvBool('NEXT_PUBLIC_FORCE_XOR_INVERT', false)),
+        escInvert: String(getEnvBool('NEXT_PUBLIC_PRINTER_INVERT_ESC', false)),
+        bitOrder: getEnvString('NEXT_PUBLIC_BIT_ORDER') || 'msb',
+        widthDots: String(PRINTER_SAFE_WIDTH),
+        dither: getEnvString('NEXT_PUBLIC_DITHER_MODE') || 'floyd',
+      });
+      const imageBytes = await convertImageToEscPosRaster(dataUrl, invert);
+      const buf = imageBytes.buffer.slice(imageBytes.byteOffset, imageBytes.byteOffset + imageBytes.byteLength);
+      const jobId = store.addPrintJob("image", buf);
+      toast({ title: "프린트 시작", description: `${messageData.senderName}님의 메시지를 출력합니다.` });
+      return jobId;
+    }
+
+    // 사진만 있는 경우 → 사진만 출력
+    if (messageData.imageUrl && !messageData.text) {
+      const invert = shouldInvertForPrinter(store.connectedPrinter?.name);
+      debugPrinterConfig('printMessage(imageOnly)', {
         deviceName: store.connectedPrinter?.name || '',
         invertMode: getEnvString('NEXT_PUBLIC_PRINTER_INVERT_MODE'),
         invertResolved: String(invert),
@@ -77,15 +96,33 @@ export function useBlePrinter() {
       });
       const imageBytes = await convertImageToEscPosRaster(messageData.imageUrl, invert);
       const buf = imageBytes.buffer.slice(imageBytes.byteOffset, imageBytes.byteOffset + imageBytes.byteLength);
-      lastJobId = store.addPrintJob("image", buf);
+      const jobId = store.addPrintJob("image", buf);
+      toast({ title: "프린트 시작", description: `${messageData.senderName}님의 메시지를 출력합니다.` });
+      return jobId;
     }
 
-    // 2) 메시지 본문 출력
-    const printData = formatMessageForPrint(messageData);
-    lastJobId = store.addPrintJob("message", printData);
+    // 텍스트만 있는 경우 → 한글/이모지 보장을 위해 이미지로 변환 후 출력
+    if (messageData.text && !messageData.imageUrl) {
+      const dataUrl = await renderTextToDataUrl(messageData.text);
+      const invert = shouldInvertForPrinter(store.connectedPrinter?.name);
+      debugPrinterConfig('printMessage(textOnly)', {
+        deviceName: store.connectedPrinter?.name || '',
+        invertMode: getEnvString('NEXT_PUBLIC_PRINTER_INVERT_MODE'),
+        invertResolved: String(invert),
+        xorInvert: String(getEnvBool('NEXT_PUBLIC_FORCE_XOR_INVERT', false)),
+        escInvert: String(getEnvBool('NEXT_PUBLIC_PRINTER_INVERT_ESC', false)),
+        bitOrder: getEnvString('NEXT_PUBLIC_BIT_ORDER') || 'msb',
+        widthDots: String(PRINTER_SAFE_WIDTH),
+        dither: getEnvString('NEXT_PUBLIC_DITHER_MODE') || 'floyd',
+      });
+      const imageBytes = await convertImageToEscPosRaster(dataUrl, invert);
+      const buf = imageBytes.buffer.slice(imageBytes.byteOffset, imageBytes.byteOffset + imageBytes.byteLength);
+      const jobId = store.addPrintJob("image", buf);
+      toast({ title: "프린트 시작", description: `${messageData.senderName}님의 메시지를 출력합니다.` });
+      return jobId;
+    }
 
-    toast({ title: "프린트 시작", description: `${messageData.senderName}님의 메시지를 출력합니다.` });
-    return lastJobId;
+    throw new Error("출력할 내용이 없습니다.");
   };
 
   const printText = async (text: string): Promise<string> => {
@@ -178,19 +215,51 @@ export function useBlePrinter() {
   };
 }
 
-function formatMessageForPrint(messageData: { text?: string; imageUrl?: string; lcdTeaser?: string; senderName: string; }): string {
-  let printContent = "";
-  printContent += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-  printContent += `         📨 PENSIEVE MESSAGE\n`;
-  printContent += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-  printContent += `FROM: ${messageData.senderName}\n`;
-  printContent += `TIME: ${new Date().toLocaleString("ko-KR")}\n\n`;
-  if (messageData.imageUrl) printContent += `📷 [IMAGE ATTACHED]\n\n`;
-  if (messageData.text) { printContent += `MESSAGE:\n`; printContent += `${messageData.text}\n\n`; }
-  printContent += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-  printContent += `      🖨️ Studio Pensieve\n`;
-  printContent += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-  return printContent;
+// 사진 + 텍스트를 하나의 캔버스에 합성하여 DataURL 반환 (인스타그램 피드형)
+async function composeFeedDataUrl(photoUrl: string, text: string): Promise<string> {
+  const width = Math.max(64, PRINTER_SAFE_WIDTH);
+  const left = Math.max(0, getEnvNumber('NEXT_PUBLIC_LEFT_MARGIN_DOTS', 0));
+  const contentWidth = Math.max(1, width - left);
+
+  const img = await loadImage(photoUrl);
+  const ratio = contentWidth / img.width;
+  const imageHeight = Math.max(1, Math.round(img.height * ratio));
+
+  const lineHeight = 56;
+  const gap = 14; // 사진과 텍스트 사이 여백
+  const lines = wrapText(text, 9);
+  const textHeight = Math.max(0, lines.length * lineHeight + 12);
+  const height = Math.min(6000, imageHeight + (lines.length > 0 ? gap + textHeight : 0));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas context 생성 실패');
+
+  // 배경 흰색
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, width, height);
+
+  // 사진 렌더링(좌측 여백 적용)
+  ctx.imageSmoothingEnabled = true as any;
+  ctx.imageSmoothingQuality = 'high' as any;
+  ctx.drawImage(img, 0, 0, img.width, img.height, left, 0, contentWidth, imageHeight);
+
+  // 텍스트 렌더링
+  if (lines.length > 0) {
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 40px system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, Apple SD Gothic Neo, Malgun Gothic, sans-serif';
+    ctx.textBaseline = 'top';
+    let y = imageHeight + gap;
+    for (const line of lines) {
+      ctx.fillText(line, left + 12, y);
+      y += lineHeight;
+      if (y > height - lineHeight) break;
+    }
+  }
+
+  return canvas.toDataURL('image/png');
 }
 
 // ESC/POS 래스터 이미지(안전 모드)
@@ -291,6 +360,16 @@ async function loadAndDitherImage(src: string, maxWidth: number): Promise<{width
   });
 }
 
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('이미지 로드 실패'));
+    img.src = src;
+  });
+}
+
 function packMonochromeToRaster(pixels: Uint8Array, width: number, height: number, invertBits = false, bitOrder: 'msb' | 'lsb' = 'msb'): { widthBytes: number; height: number; data: Uint8Array } {
   const widthBytes = Math.ceil(width / 8);
   const data = new Uint8Array(widthBytes * height);
@@ -352,8 +431,8 @@ function debugPrinterConfig(tag: string, cfg: Record<string,string>) {
 async function renderTextToDataUrl(text: string): Promise<string> {
   const width = Math.max(64, PRINTER_SAFE_WIDTH);
   // 대략적 줄바꿈을 고려한 높이 추정 (최대 6줄 기준 확대)
-  const lineHeight = 28;
-  const lines = wrapText(text, 18); // 18자 기준 개행(한글 가변폭 보정용 보수값)
+  const lineHeight = 56;
+  const lines = wrapText(text, 9); // 9자 기준 개행(폰트 40px 기준 보정)
   const height = Math.max(64, Math.min(2000, lines.length * lineHeight + 24));
 
   const canvas = document.createElement('canvas');
@@ -364,7 +443,7 @@ async function renderTextToDataUrl(text: string): Promise<string> {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, width, height);
   ctx.fillStyle = '#000000';
-  ctx.font = 'bold 20px system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, Apple SD Gothic Neo, Malgun Gothic, sans-serif';
+  ctx.font = 'bold 40px system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, Apple SD Gothic Neo, Malgun Gothic, sans-serif';
   ctx.textBaseline = 'top';
 
   let y = 12;

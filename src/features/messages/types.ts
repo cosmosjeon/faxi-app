@@ -57,6 +57,21 @@ export interface MessageWithProfiles {
   };
 }
 
+// 홈 피드용 미리보기 타입 (본문/이미지 제외)
+export interface MessagePreview {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  lcd_teaser: string | null;
+  print_status: MessagePrintStatus;
+  created_at: string;
+  sender_profile: {
+    id: string;
+    display_name: string;
+    avatar_url: string | null;
+  };
+}
+
 // 이미지 업로드 결과 타입
 export interface ImageUploadResult {
   url: string;

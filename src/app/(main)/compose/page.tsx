@@ -66,6 +66,157 @@ export default function ComposePage() {
   // 이미지 미리보기
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
+  // 프린트 미리보기
+  const [printPreviewUrl, setPrintPreviewUrl] = useState<string>("");
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState<boolean>(false);
+  const PRINTER_SAFE_WIDTH = (() => {
+    const v = typeof process !== "undefined" ? Number(process.env.NEXT_PUBLIC_PRINT_WIDTH_DOTS) : NaN;
+    return Number.isFinite(v) && v > 0 ? Math.round(v) : 288;
+  })();
+  const getEnvNumber = (key: string, fallback: number) => {
+    const v = typeof process !== "undefined" ? Number(process.env[key as keyof NodeJS.ProcessEnv]) : NaN;
+    return Number.isFinite(v) ? v : fallback;
+  };
+  const wrapText = (text: string, maxCharsPerLine: number): string[] => {
+    const words = String(text).split(/\s+/);
+    const lines: string[] = [];
+    let line = "";
+    for (const w of words) {
+      const candidate = line ? `${line} ${w}` : w;
+      if (candidate.length > maxCharsPerLine) {
+        if (line) lines.push(line);
+        if (w.length > maxCharsPerLine) {
+          for (let i = 0; i < w.length; i += maxCharsPerLine) {
+            lines.push(w.slice(i, i + maxCharsPerLine));
+          }
+          line = "";
+        } else {
+          line = w;
+        }
+      } else {
+        line = candidate;
+      }
+    }
+    if (line) lines.push(line);
+    return lines;
+  };
+  const loadImage = (src: string): Promise<HTMLImageElement> => {
+    return new Promise((resolve, reject) => {
+      const img = new window.Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("이미지 로드 실패"));
+      img.src = src;
+    });
+  };
+  const renderTextToDataUrl = async (text: string): Promise<string> => {
+    const width = Math.max(64, PRINTER_SAFE_WIDTH);
+    const lineHeight = 56;
+    const lines = wrapText(text, 9);
+    const height = Math.max(64, Math.min(2000, lines.length * lineHeight + 24));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas context 생성 실패");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = "#000000";
+    ctx.font = "bold 40px system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, Apple SD Gothic Neo, Malgun Gothic, sans-serif";
+    ctx.textBaseline = "top";
+    let y = 12;
+    const left = 12 + Math.max(0, getEnvNumber("NEXT_PUBLIC_LEFT_MARGIN_DOTS", 0));
+    for (const line of lines) {
+      ctx.fillText(line, left, y);
+      y += lineHeight;
+      if (y > height - lineHeight) break;
+    }
+    return canvas.toDataURL("image/png");
+  };
+  const composeFeedDataUrl = async (photoUrl: string, text: string): Promise<string> => {
+    const width = Math.max(64, PRINTER_SAFE_WIDTH);
+    const left = Math.max(0, getEnvNumber("NEXT_PUBLIC_LEFT_MARGIN_DOTS", 0));
+    const contentWidth = Math.max(1, width - left);
+    const img = await loadImage(photoUrl);
+    const ratio = contentWidth / img.width;
+    const imageHeight = Math.max(1, Math.round(img.height * ratio));
+    const lineHeight = 56;
+    const gap = 14;
+    const lines = wrapText(text, 9);
+    const textHeight = Math.max(0, lines.length * lineHeight + 12);
+    const height = Math.min(6000, imageHeight + (lines.length > 0 ? gap + textHeight : 0));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas context 생성 실패");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+    (ctx as any).imageSmoothingEnabled = true;
+    (ctx as any).imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, img.width, img.height, left, 0, contentWidth, imageHeight);
+    if (lines.length > 0) {
+      ctx.fillStyle = "#000000";
+      ctx.font = "bold 40px system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, Apple SD Gothic Neo, Malgun Gothic, sans-serif";
+      ctx.textBaseline = "top";
+      let y = imageHeight + gap;
+      for (const line of lines) {
+        ctx.fillText(line, left + 12, y);
+        y += lineHeight;
+        if (y > height - lineHeight) break;
+      }
+    }
+    return canvas.toDataURL("image/png");
+  };
+  const scaleImageToWidth = async (photoUrl: string): Promise<string> => {
+    const width = Math.max(64, PRINTER_SAFE_WIDTH);
+    const left = Math.max(0, getEnvNumber("NEXT_PUBLIC_LEFT_MARGIN_DOTS", 0));
+    const contentWidth = Math.max(1, width - left);
+    const img = await loadImage(photoUrl);
+    const ratio = contentWidth / img.width;
+    const imageHeight = Math.max(1, Math.round(img.height * ratio));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = imageHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas context 생성 실패");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, imageHeight);
+    (ctx as any).imageSmoothingEnabled = true;
+    (ctx as any).imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, img.width, img.height, left, 0, contentWidth, imageHeight);
+    return canvas.toDataURL("image/png");
+  };
+  useEffect(() => {
+    const generate = async () => {
+      try {
+        const text = (formData.content || "").trim();
+        const hasText = text.length > 0;
+        const hasImage = Boolean(imagePreview);
+        if (!hasText && !hasImage) {
+          setPrintPreviewUrl("");
+          return;
+        }
+        setIsGeneratingPreview(true);
+        if (hasText && hasImage && imagePreview) {
+          const url = await composeFeedDataUrl(imagePreview, text);
+          setPrintPreviewUrl(url);
+        } else if (hasText && !hasImage) {
+          const url = await renderTextToDataUrl(text);
+          setPrintPreviewUrl(url);
+        } else if (!hasText && hasImage && imagePreview) {
+          const url = await scaleImageToWidth(imagePreview);
+          setPrintPreviewUrl(url);
+        }
+      } catch (e) {
+        setPrintPreviewUrl("");
+      } finally {
+        setIsGeneratingPreview(false);
+      }
+    };
+    void generate();
+  }, [formData.content, imagePreview]);
+
   // 이미지 파일 유효성 검사
   const validateImageFile = (file: File) => {
     const maxSize = 5 * 1024 * 1024; // 5MB
@@ -606,6 +757,29 @@ export default function ComposePage() {
                 />
               </CardContent>
             </Card>
+
+            {/* 출력 미리보기 */}
+            {(printPreviewUrl || isGeneratingPreview) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>프린트 미리보기</CardTitle>
+                  <CardDescription>실제 프린터 폭(약 58mm)에 맞춘 최종 출력 모습</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isGeneratingPreview ? (
+                    <div className="flex items-center justify-center h-40 text-gray-500">미리보기 생성 중...</div>
+                  ) : (
+                    <div className="flex justify-center">
+                      <div className="border-2 border-dashed border-gray-300 p-3 rounded-lg bg-white">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={printPreviewUrl} alt="프린트 미리보기" className="max-w-full h-auto" />
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500 text-center mt-2">미리보기는 실제 인쇄 결과와 거의 동일합니다.</p>
+                </CardContent>
+              </Card>
+            )}
 
             {/* 일반 오류 메시지 */}
             {errors.general && (

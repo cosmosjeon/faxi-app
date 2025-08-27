@@ -36,8 +36,9 @@ const firebaseConfig = {
 
 // Firebase 설정 유효성 검사
 function validateFirebaseConfig() {
-  const required = ['apiKey', 'authDomain', 'projectId', 'messagingSenderId', 'appId'];
-  const missing = required.filter(key => !firebaseConfig[key]);
+  const required = ['apiKey', 'authDomain', 'projectId', 'messagingSenderId', 'appId'] as const;
+  type RequiredKey = typeof required[number];
+  const missing = required.filter((key: RequiredKey) => !firebaseConfig[key]);
   
   devLog('Firebase 설정 검증:', {
     apiKey: firebaseConfig.apiKey ? 'set' : '없음',

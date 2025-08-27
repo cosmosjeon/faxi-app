@@ -144,7 +144,7 @@ interface PrinterStore {
 
   // 액션
   checkBleSupport: () => void;
-  connectPrinter: () => Promise<void>;
+  connectPrinter: (retryCount?: number) => Promise<void>;
   selectMockDevice: (device: MockDevice) => void;
   cancelDeviceSelection: () => void;
   disconnectPrinter: () => Promise<void>;
@@ -188,9 +188,11 @@ export const usePrinterStore = create<PrinterStore>((set, get) => ({
     }
   },
 
-  // 프린터 연결
-  connectPrinter: async () => {
+  // 프린터 연결 (재시도 로직 포함)
+  connectPrinter: async (retryCount = 0) => {
     const { isDevelopmentMode, isSupported } = get();
+    const MAX_RETRY_ATTEMPTS = 3;
+    const RETRY_DELAY = 1000; // 1초
 
     if (isDevelopmentMode) {
       // 개발 모드: Mock 기기 선택 UI 표시
@@ -292,12 +294,22 @@ export const usePrinterStore = create<PrinterStore>((set, get) => ({
       logger.info("🖨️ 프린터 연결 완료:", printerInfo);
     } catch (error) {
       console.error("프린터 연결 실패:", error);
+      
+      // 재시도 로직
+      if (retryCount < MAX_RETRY_ATTEMPTS) {
+        console.warn(`🔄 프린터 연결 재시도 (${retryCount + 1}/${MAX_RETRY_ATTEMPTS})`);
+        setTimeout(() => {
+          get().connectPrinter(retryCount + 1);
+        }, RETRY_DELAY * (retryCount + 1)); // 점진적 지연
+        return;
+      }
+      
       printerToasts.connectError();
       set({
         status: "error",
         error:
           error instanceof Error
-            ? error.message
+            ? `연결 실패 (${MAX_RETRY_ATTEMPTS}회 시도): ${error.message}`
             : "프린터 연결에 실패했습니다.",
         connectedPrinter: null,
       });
