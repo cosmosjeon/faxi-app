@@ -11,34 +11,15 @@ import { Home, Users, PlusCircle, Printer, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 // 탭 최적화 훅
 import { useTabOptimization } from "@/hooks/useTabOptimization";
+import { useTranslation } from "@/lib/i18n/LanguageProvider";
 
 // 하단 탭바의 탭 정보 배열
 const tabs = [
-  {
-    href: "/home", // 홈 페이지 경로
-    label: "홈", // 탭에 표시될 텍스트
-    icon: Home, // 탭에 표시될 아이콘
-  },
-  {
-    href: "/friends", // 친구 페이지 경로
-    label: "친구",
-    icon: Users, // 여러 사용자 아이콘
-  },
-  {
-    href: "/compose", // 메시지 작성 페이지 경로
-    label: "전송",
-    icon: PlusCircle, // 플러스 원형 아이콘
-  },
-  {
-    href: "/printer", // 프린터 관리 페이지 경로
-    label: "프린터",
-    icon: Printer, // 프린터 아이콘
-  },
-  {
-    href: "/profile", // 프로필 페이지 경로
-    label: "프로필",
-    icon: User, // 사용자 아이콘
-  },
+  { href: "/home", labelKey: "tabs.home", icon: Home },
+  { href: "/friends", labelKey: "tabs.friends", icon: Users },
+  { href: "/compose", labelKey: "tabs.send", icon: PlusCircle },
+  { href: "/printer", labelKey: "tabs.printer", icon: Printer },
+  { href: "/profile", labelKey: "tabs.profile", icon: User },
 ];
 
 // 하단 탭바 컴포넌트
@@ -47,6 +28,7 @@ export function BottomTabBar() {
   const pathname = usePathname();
   // 탭 최적화 훅
   const { handleTabHover } = useTabOptimization();
+  const { t } = useTranslation();
 
   return (
     // 네비게이션 컨테이너 - 화면 하단에 고정
@@ -93,7 +75,7 @@ export function BottomTabBar() {
                   isActive ? "text-blue-600" : "text-gray-500"
                 )}
               >
-                {tab.label}
+                {t(tab.labelKey)}
               </span>
             </Link>
           );

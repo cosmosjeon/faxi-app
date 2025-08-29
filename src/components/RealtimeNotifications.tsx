@@ -33,12 +33,12 @@ export const RealtimeNotifications = () => {
 
       if (error) throw error;
 
-      const name = profile?.display_name || profile?.username || "사용자";
+      const name = profile?.display_name || profile?.username || "User";
       userCache.current.set(userId, name);
       return name;
     } catch (error) {
       console.warn("Failed to get user profile:", error);
-      return "사용자";
+      return "User";
     }
   };
 
@@ -83,11 +83,11 @@ export const RealtimeNotifications = () => {
             const messagePreview = event.data.new.content
               ? event.data.new.content.substring(0, 30) +
                 (event.data.new.content.length > 30 ? "..." : "")
-              : "사진 메시지";
+              : "Image message";
 
             showNotification(
-              `📨 새 메시지`,
-              `${senderName}님이 메시지를 보냈습니다: ${messagePreview}`
+              `📨 New message`,
+              `${senderName} sent a message: ${messagePreview}`
             );
             break;
           }
@@ -95,8 +95,8 @@ export const RealtimeNotifications = () => {
           case "friend_request": {
             const requesterName = await getUserName(event.data.new.user_id);
             showNotification(
-              `👥 새 친구 요청`,
-              `${requesterName}님이 친구 요청을 보냈습니다`
+              `👥 New friend request`,
+              `${requesterName} sent you a friend request`
             );
             break;
           }
@@ -104,7 +104,7 @@ export const RealtimeNotifications = () => {
           case "friend_accepted": {
             // 현재 MVP에서는 친구 요청 수락 알림을 비활성화
             // (친한친구 해제 등으로 인한 잘못된 이벤트와 구분이 어려움)
-            console.log("친구 요청 수락 이벤트 감지 (알림 생략):", event);
+            console.log("Friend request accepted (notification suppressed):", event);
             break;
           }
 
@@ -113,8 +113,8 @@ export const RealtimeNotifications = () => {
               event.data.new.requester_id
             );
             showNotification(
-              `💖 친한친구 요청`,
-              `${requesterName}님이 친한친구 요청을 보냈습니다`
+              `💖 Close friend request`,
+              `${requesterName} sent a close-friend request`
             );
             break;
           }
@@ -122,8 +122,8 @@ export const RealtimeNotifications = () => {
           case "close_friend_accepted": {
             const accepterName = await getUserName(event.data.new.target_id);
             showNotification(
-              `💖 친한친구 수락`,
-              `${accepterName}님이 친한친구 요청을 수락했습니다`
+              `💖 Close friend accepted`,
+              `${accepterName} accepted your close-friend request`
             );
             break;
           }
@@ -131,13 +131,13 @@ export const RealtimeNotifications = () => {
           case "message_status_update": {
             if (event.data.new.print_status === "completed") {
               showNotification(
-                `📄 프린트 완료`,
-                `메시지가 성공적으로 프린트되었습니다`
+                `📄 Print completed`,
+                `The message has been printed successfully`
               );
             } else if (event.data.new.print_status === "failed") {
               showNotification(
-                `❌ 프린트 실패`,
-                `메시지 프린트에 실패했습니다`
+                `❌ Print failed`,
+                `Failed to print the message`
               );
             }
             break;

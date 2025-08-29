@@ -1,1 +1,16 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.cosmosjeon.faxi",
+      "sha256_cert_fingerprints": [
+        "C2:87:92:BD:14:F1:E9:D6:44:ED:B1:09:47:30:49:67:15:4F:2E:77:48:B1:84:1E:C3:EE:D8:85:F9:F9:08:38"
+      ]
+    }
+  }
+]
+
 [{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app","package_name":"com.cosmosjeon.faxi","sha256_cert_fingerprints":["C2:87:92:BD:14:F1:E9:D6:44:ED:B1:09:47:30:49:67:15:4F:2E:77:48:B1:84:1E:C3:EE:D8:85:F9:F9:08:38"]}}]

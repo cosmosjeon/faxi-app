@@ -34,11 +34,13 @@ import type {
 } from "@/features/messages/types";
 import { toast } from "@/hooks/use-toast";
 import { ImageEditor } from "@/components/domain/image/ImageEditor";
+import { useTranslation } from "@/lib/i18n/LanguageProvider";
 
 export default function ComposePage() {
   const router = useRouter();
   const { profile } = useAuthStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { t } = useTranslation();
 
 
   // 상태 관리
@@ -77,6 +79,16 @@ export default function ComposePage() {
     const v = typeof process !== "undefined" ? Number(process.env[key as keyof NodeJS.ProcessEnv]) : NaN;
     return Number.isFinite(v) ? v : fallback;
   };
+  // 영어 전용 타이포그래피 조정: 한국어는 기존 값 유지
+  const isEnglishLike = (s: string): boolean => /[A-Za-z]/.test(s) && !/[가-힣]/.test(s);
+  const getTypographyFor = (text: string) => {
+    if (isEnglishLike(text)) {
+      // 영어: 글씨 조금 작게, 한 줄 글자수 확대 → 우측 여백 감소
+      return { fontSize: 28, lineHeight: 42, maxChars: 18, fontWeight: 600 as 600 | 700 };
+    }
+    // 한국어 기본
+    return { fontSize: 32, lineHeight: 48, maxChars: 12, fontWeight: 700 as 600 | 700 };
+  };
   const wrapText = (text: string, maxCharsPerLine: number): string[] => {
     const words = String(text).split(/\s+/);
     const lines: string[] = [];
@@ -111,8 +123,8 @@ export default function ComposePage() {
   };
   const renderTextToDataUrl = async (text: string): Promise<string> => {
     const width = Math.max(64, PRINTER_SAFE_WIDTH);
-    const lineHeight = 48;
-    const lines = wrapText(text, 12);
+    const { fontSize, lineHeight, maxChars, fontWeight } = getTypographyFor(text);
+    const lines = wrapText(text, maxChars);
     const height = Math.max(64, Math.min(2000, lines.length * lineHeight + 24));
     const canvas = document.createElement("canvas");
     canvas.width = width;
@@ -122,7 +134,7 @@ export default function ComposePage() {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, width, height);
     ctx.fillStyle = "#000000";
-    ctx.font = "bold 32px system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, Apple SD Gothic Neo, Malgun Gothic, sans-serif";
+    ctx.font = `${fontWeight} ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, Apple SD Gothic Neo, Malgun Gothic, sans-serif`;
     ctx.textBaseline = "top";
     let y = 12;
     const left = 6 + Math.max(0, getEnvNumber("NEXT_PUBLIC_LEFT_MARGIN_DOTS", 0));
@@ -140,9 +152,9 @@ export default function ComposePage() {
     const img = await loadImage(photoUrl);
     const ratio = contentWidth / img.width;
     const imageHeight = Math.max(1, Math.round(img.height * ratio));
-    const lineHeight = 48;
+    const { fontSize, lineHeight, maxChars, fontWeight } = getTypographyFor(text);
     const gap = 14;
-    const lines = wrapText(text, 12);
+    const lines = wrapText(text, maxChars);
     const textHeight = Math.max(0, lines.length * lineHeight + 12);
     const height = Math.min(6000, imageHeight + (lines.length > 0 ? gap + textHeight : 0));
     const canvas = document.createElement("canvas");
@@ -157,7 +169,7 @@ export default function ComposePage() {
     ctx.drawImage(img, 0, 0, img.width, img.height, left, 0, contentWidth, imageHeight);
     if (lines.length > 0) {
       ctx.fillStyle = "#000000";
-      ctx.font = "bold 32px system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, Apple SD Gothic Neo, Malgun Gothic, sans-serif";
+      ctx.font = `${fontWeight} ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, Apple SD Gothic Neo, Malgun Gothic, sans-serif`;
       ctx.textBaseline = "top";
       let y = imageHeight + gap;
       for (const line of lines) {
@@ -503,12 +515,10 @@ export default function ComposePage() {
           </Button>
           <div>
             <h1 className="text-xl font-semibold text-gray-900 leading-tight">
-              {editMode === "imageEdit" ? "이미지 편집" : "메시지 전송"}
+              {editMode === "imageEdit" ? t("compose.imageEdit") : t("compose.title")}
             </h1>
             <p className="text-gray-600 mt-0.5">
-              {editMode === "imageEdit"
-                ? "사진을 크롭하고 저장하세요"
-                : "친구에게 특별한 메시지를 보내보세요"}
+              {editMode === "imageEdit" ? t("compose.imageEditDesc") : t("compose.subtitle")}
             </p>
           </div>
         </div>
@@ -537,7 +547,7 @@ export default function ComposePage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users size={20} />
-                  받는 사람
+                  {t("compose.recipients")}
                 </CardTitle>
                 {errors.receiver_id && (
                   <p className="text-sm text-red-500">{errors.receiver_id}</p>
@@ -547,19 +557,17 @@ export default function ComposePage() {
                 {isLoadingFriends ? (
                   <div className="flex items-center justify-center p-4">
                     <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                    <span className="ml-2 text-gray-600">
-                      친구 목록 불러오는 중...
-                    </span>
+                    <span className="ml-2 text-gray-600">{t("compose.loadingFriends")}</span>
                   </div>
                 ) : friends.length === 0 ? (
                   <div className="text-center p-4 text-gray-500">
-                    <p>아직 친구가 없습니다</p>
+                    <p>{t("friends.noFriends")}</p>
                     <Button
                       variant="link"
                       onClick={() => router.push("/friends/add")}
                       className="mt-2"
                     >
-                      친구 추가하기
+                      {t("friends.add.cta")}
                     </Button>
                   </div>
                 ) : (
@@ -598,19 +606,15 @@ export default function ComposePage() {
 
                     {/* 선택 요약 + 모두 지우기 */}
                     <div className="flex items-center justify-between">
-                      <p className="text-sm text-gray-600">
-                        총 {selectedRecipientIds.length}명 선택됨
-                      </p>
+                      <p className="text-sm text-gray-600">{t("compose.selectedCount", { count: selectedRecipientIds.length })}</p>
                       {selectedRecipientIds.length > 0 && (
-                        <Button variant="ghost" size="sm" onClick={clearRecipients}>
-                          모두 지우기
-                        </Button>
+                        <Button variant="ghost" size="sm" onClick={clearRecipients}>{t("common.clearAll")}</Button>
                       )}
                     </div>
 
                     {/* 검색 인풋 */}
                     <Input
-                      placeholder="이름으로 검색..."
+                      placeholder={t("compose.searchByName")}
                       value={recipientSearch}
                       onChange={(e) => setRecipientSearch(e.target.value)}
                     />
@@ -618,7 +622,7 @@ export default function ComposePage() {
                     {/* 검색 결과 리스트 */}
                     <div className="border rounded-md divide-y max-h-56 overflow-auto">
                       {filteredFriends.length === 0 ? (
-                        <div className="p-3 text-sm text-gray-500">검색 결과가 없습니다</div>
+                        <div className="p-3 text-sm text-gray-500">{t("common.noSearchResults")}</div>
                       ) : (
                         filteredFriends.map((friend) => (
                           <button
@@ -639,7 +643,7 @@ export default function ComposePage() {
                             <span className="text-sm">{friend.friend_profile.display_name}</span>
                             {friend.is_close_friend && (
                               <span className="ml-auto text-xs bg-red-100 text-red-600 px-1 rounded">
-                                친한친구
+                                {t("friends.closeFriendBadge")}
                               </span>
                             )}
                           </button>
@@ -654,44 +658,38 @@ export default function ComposePage() {
             {/* 메시지 내용 */}
             <Card>
               <CardHeader>
-                <CardTitle>메시지 내용</CardTitle>
-                <CardDescription>
-                  최대 200자까지 입력할 수 있습니다
-                </CardDescription>
+                <CardTitle>{t("compose.messageTitle")}</CardTitle>
+                <CardDescription>{t("compose.messageDesc")}</CardDescription>
                 {errors.content && (
                   <p className="text-sm text-red-500">{errors.content}</p>
                 )}
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="message">메시지</Label>
+                  <Label htmlFor="message">{t("compose.messageLabel")}</Label>
                   <Textarea
                     id="message"
-                    placeholder="따뜻한 메시지를 작성해보세요..."
+                    placeholder={t("compose.messagePlaceholder")}
                     className="mt-1"
                     rows={4}
                     value={formData.content}
                     onChange={(e) => handleContentChange(e.target.value)}
                     maxLength={200}
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    {formData.content.length}/200자
-                  </p>
+                  <p className="text-xs text-gray-500 mt-1">{t("compose.messageCounter", { count: formData.content.length })}</p>
                 </div>
 
                 <div>
-                  <Label htmlFor="teaser">LCD 티저</Label>
+                  <Label htmlFor="teaser">{t("compose.lcdTeaser")}</Label>
                   <Input
                     id="teaser"
-                    placeholder="10자 이내 짧은 미리보기"
+                    placeholder={t("compose.lcdPlaceholder")}
                     className="mt-1"
                     value={formData.lcd_teaser}
                     onChange={(e) => handleTeaserChange(e.target.value)}
                     maxLength={10}
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    {formData.lcd_teaser.length}/10자
-                  </p>
+                  <p className="text-xs text-gray-500 mt-1">{t("compose.lcdCounter", { count: formData.lcd_teaser.length })}</p>
                   {errors.lcd_teaser && (
                     <p className="text-sm text-red-500">{errors.lcd_teaser}</p>
                   )}
@@ -704,7 +702,7 @@ export default function ComposePage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <ImageIcon size={20} />
-                  이미지 첨부 (선택)
+                  {t("compose.imageAttach")}
                 </CardTitle>
                 {errors.image_file && (
                   <p className="text-sm text-red-500">{errors.image_file}</p>
@@ -715,7 +713,7 @@ export default function ComposePage() {
                   <div className="relative">
                     <Image
                       src={imagePreview}
-                      alt="이미지 미리보기"
+                      alt={t("compose.imagePreviewAlt")}
                       width={400}
                       height={192}
                       className="w-full rounded-lg max-h-48 object-cover"
@@ -742,10 +740,8 @@ export default function ComposePage() {
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <ImageIcon size={48} className="mx-auto text-gray-400 mb-4" />
-                    <p className="text-gray-500">이미지를 선택하세요</p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      JPG, PNG 최대 5MB
-                    </p>
+                    <p className="text-gray-500">{t("compose.pickImage")}</p>
+                    <p className="text-xs text-gray-400 mt-1">{t("compose.imageHint")}</p>
                   </div>
                 )}
                 <input
@@ -762,21 +758,21 @@ export default function ComposePage() {
             {(printPreviewUrl || isGeneratingPreview) && (
               <Card>
                 <CardHeader>
-                  <CardTitle>프린트 미리보기</CardTitle>
-                  <CardDescription>실제 프린터 폭(약 58mm)에 맞춘 최종 출력 모습</CardDescription>
+                  <CardTitle>{t("compose.printPreview")}</CardTitle>
+                  <CardDescription>{t("compose.printPreviewDesc")}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {isGeneratingPreview ? (
-                    <div className="flex items-center justify-center h-40 text-gray-500">미리보기 생성 중...</div>
+                    <div className="flex items-center justify-center h-40 text-gray-500">{t("compose.generatingPreview")}</div>
                   ) : (
                     <div className="flex justify-center">
                       <div className="border-2 border-dashed border-gray-300 p-3 rounded-lg bg-white">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={printPreviewUrl} alt="프린트 미리보기" className="max-w-full h-auto" />
+                        <img src={printPreviewUrl} alt={t("compose.printPreviewAlt")} className="max-w-full h-auto" />
                       </div>
                     </div>
                   )}
-                  <p className="text-xs text-gray-500 text-center mt-2">미리보기는 실제 인쇄 결과와 거의 동일합니다.</p>
+                  <p className="text-xs text-gray-500 text-center mt-2">{t("compose.previewNote")}</p>
                 </CardContent>
               </Card>
             )}
@@ -796,11 +792,11 @@ export default function ComposePage() {
               className="w-full gap-2"
               disabled={!canSend}
               loading={isSending}
-              loadingText="전송 중..."
+              loadingText={t("compose.sending")}
               onClick={handleSend}
             >
               <Send size={20} />
-              메시지 전송
+              {t("compose.send")}
             </LoadingButton>
           </>
         )}

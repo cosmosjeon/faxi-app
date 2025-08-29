@@ -55,6 +55,9 @@ export async function getUserSettings(
         // MVP 개인정보 설정 (필수)
         profile_visibility: "public" as const,
         show_online_status: true,
+
+        // 언어 설정 (신규)
+        language: "ko" as const,
       };
 
       // 누락된 필드 찾기
@@ -142,6 +145,9 @@ export async function createDefaultSettings(
       // MVP 개인정보 설정
       profile_visibility: "public" as const,
       show_online_status: true,
+
+      // 언어 기본값
+      language: "ko" as const,
     };
 
     console.log("🏗️ 생성할 설정 구조:", {
@@ -177,6 +183,7 @@ export async function createDefaultSettings(
         marketing_notifications: false,
         profile_visibility: "public" as const,
         show_online_status: true,
+        language: "ko" as const,
       };
 
       console.log("🛡️ 안전한 기본 설정으로 재시도:", defaultSettings);
@@ -205,6 +212,7 @@ export async function createDefaultSettings(
           marketing_notifications: false,
           profile_visibility: "public" as const,
           show_online_status: true,
+          language: "ko" as const,
         };
 
         try {

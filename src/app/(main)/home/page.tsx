@@ -47,10 +47,12 @@ import { toast } from "@/hooks/use-toast";
 import { CardLoading } from "@/components/ui/page-loading";
 import { useRealtimeDataSync } from "@/hooks/useRealtimeDataSync";
 import { MessageCard } from "@/components/domain/messages/MessageCard";
+import { useTranslation } from "@/lib/i18n/LanguageProvider";
 export default function HomePage() {
   const router = useRouter();
   const { profile, signOut } = useAuthStore();
   const printer = useBlePrinter();
+  const { t } = useTranslation();
 
   // 프린터 상태 실시간 모니터링 (디버깅용)
   useEffect(() => {
@@ -88,14 +90,14 @@ export default function HomePage() {
       await signOut();
       router.push("/login");
       toast({
-        title: "로그아웃 완료",
-        description: "성공적으로 로그아웃되었습니다.",
+        title: t("common.logout"),
+        description: t("profile.title"),
       });
     } catch (error) {
       console.error("로그아웃 실패:", error);
       toast({
-        title: "로그아웃 실패",
-        description: "로그아웃 중 오류가 발생했습니다.",
+        title: t("common.logout"),
+        description: "",
         variant: "destructive",
       });
     }
@@ -883,12 +885,12 @@ export default function HomePage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-semibold text-gray-900 leading-tight">
-                안녕하세요, {profile?.display_name || "사용자"}님! 👋
+                {t("home.greeting", { name: profile?.display_name || t("profile.unknown_user") })}
               </h1>
               <p className="text-gray-600 mt-0.5">
                 {pendingCount > 0
-                  ? `${pendingCount}개의 새로운 메시지가 있습니다`
-                  : "새로운 메시지를 확인해보세요"}
+                  ? t("home.pendingCount", { count: pendingCount })
+                  : t("home.noNewMessages")}
               </p>
             </div>
             {profile && (
@@ -898,7 +900,7 @@ export default function HomePage() {
                 className="text-red-600 hover:text-red-700"
               >
                 <LogOut size={18} />
-                로그아웃
+                {t("common.logout")}
               </Button>
             )}
           </div>
@@ -908,7 +910,7 @@ export default function HomePage() {
             {printer.isConnected ? (
               <div className="flex items-center gap-1 text-green-600">
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span>프린터 연결됨</span>
+                <span>{t("printer.connected")}</span>
                 {printer.connectedPrinter && (
                   <span className="text-gray-500">
                     ({printer.connectedPrinter.name})
@@ -918,24 +920,24 @@ export default function HomePage() {
             ) : printer.isConnecting ? (
               <div className="flex items-center gap-1 text-blue-600">
                 <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                <span>프린터 연결 중...</span>
+                <span>{t("printer.connecting")}</span>
               </div>
             ) : printer.hasError ? (
               <div className="flex items-center gap-1 text-red-600">
                 <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                <span>프린터 연결 오류</span>
+                <span>{t("printer.error")}</span>
               </div>
             ) : (
               <div className="flex items-center gap-1 text-gray-500">
                 <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                <span>프린터 연결 안됨</span>
+                <span>{t("printer.disconnected")}</span>
               </div>
             )}
 
             {printer.isPrinting && (
               <div className="flex items-center gap-1 text-blue-600 ml-2">
                 <Printer size={12} className="animate-pulse" />
-                <span>프린트 중</span>
+                <span>{t("printer.printing")}</span>
               </div>
             )}
           </div>
@@ -944,21 +946,17 @@ export default function HomePage() {
         {/* 받은 메시지 피드 */}
         <Card>
           <CardHeader>
-            <CardTitle>받은 메시지</CardTitle>
-            <CardDescription>
-              친구들이 보낸 메시지들을 확인하고 출력해보세요
-            </CardDescription>
+            <CardTitle>{t("home.incomingTitle")}</CardTitle>
+            <CardDescription>{t("home.incomingDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <CardLoading message="메시지를 불러오는 중..." />
+              <CardLoading message={t("home.loadingMessages")} />
             ) : messages.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <div className="text-4xl mb-4">📨</div>
-                <p>아직 받은 메시지가 없습니다</p>
-                <p className="text-sm mt-2">
-                  친구를 추가하고 메시지를 받아보세요!
-                </p>
+                <p>{t("home.noMessages")}</p>
+                <p className="text-sm mt-2">{t("home.addFriendsCta")}</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -987,7 +985,7 @@ export default function HomePage() {
             <Card className="cursor-pointer hover:shadow-md transition-shadow">
               <CardContent className="p-4 text-center">
                 <UserPlus size={24} className="mx-auto mb-2 text-blue-600" />
-                <p className="font-medium">친구 추가</p>
+                <p className="font-medium">{t("home.quickAddFriend")}</p>
               </CardContent>
             </Card>
           </Link>
@@ -995,7 +993,7 @@ export default function HomePage() {
             <Card className="cursor-pointer hover:shadow-md transition-shadow">
               <CardContent className="p-4 text-center">
                 <Send size={24} className="mx-auto mb-2 text-green-600" />
-                <p className="font-medium">메시지 보내기</p>
+                <p className="font-medium">{t("home.quickCompose")}</p>
               </CardContent>
             </Card>
           </Link>
@@ -1012,7 +1010,7 @@ export default function HomePage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <Bell size={20} />새 메시지 도착
+              <Bell size={20} />{t("home.dialog.newMessage")}
             </AlertDialogTitle>
           </AlertDialogHeader>
 
@@ -1045,7 +1043,7 @@ export default function HomePage() {
                 )}
 
                 <div className="text-sm text-gray-600">
-                  이 메시지를 프린트하시겠습니까?
+                  {t("home.dialog.printConfirm")}
                 </div>
               </>
             )}
@@ -1053,10 +1051,10 @@ export default function HomePage() {
 
           <AlertDialogFooter>
             <AlertDialogCancel onClick={handleConfirmReject}>
-              거절
+              {t("common.decline")}
             </AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmPrint}>
-              프린트
+              {t("messages.print")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -22,11 +22,13 @@ import {
   updatePrivacySettings,
 } from "@/features/settings/api";
 import type { PrivacySettings, UserSettings } from "@/features/settings/types";
+import { useTranslation } from "@/lib/i18n/LanguageProvider";
 
 export default function PrivacySettingsPage() {
   const router = useRouter();
   const { profile } = useAuthStore();
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const [settings, setSettings] = useState<PrivacySettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -76,8 +78,8 @@ export default function PrivacySettingsPage() {
       } catch (error) {
         console.error("❌ 개인정보 설정 로드 실패:", error);
         toast({
-          title: "설정 로드 실패",
-          description: "개인정보 설정을 불러오는데 실패했습니다.",
+          title: t("privacy.load_failed"),
+          description: t("privacy.subtitle"),
           variant: "destructive",
         });
 
@@ -301,9 +303,9 @@ export default function PrivacySettingsPage() {
         <div className="max-w-md mx-auto">
           <Card>
             <CardContent className="p-6 text-center">
-              <p className="text-gray-600">설정을 불러올 수 없습니다.</p>
+              <p className="text-gray-600">{t("privacy.load_failed")}</p>
               <Button onClick={() => router.back()} className="mt-4">
-                돌아가기
+                {t("notifications.go_back")}
               </Button>
             </CardContent>
           </Card>
@@ -327,8 +329,8 @@ export default function PrivacySettingsPage() {
               <ArrowLeft size={20} />
             </Button>
             <div>
-              <h1 className="text-xl font-semibold text-gray-900 leading-tight">개인정보 설정</h1>
-              <p className="text-sm text-gray-600 mt-0.5">프라이버시 및 보안 설정</p>
+              <h1 className="text-xl font-semibold text-gray-900 leading-tight">{t("privacy.title")}</h1>
+              <p className="text-sm text-gray-600 mt-0.5">{t("privacy.subtitle")}</p>
             </div>
           </div>
         </div>
@@ -338,12 +340,12 @@ export default function PrivacySettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Shield size={20} />
-              개인정보 설정
+              {t("privacy.title")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-sm font-medium">프로필 공개 범위</Label>
+              <Label className="text-sm font-medium">{t("privacy.profile_visibility")}</Label>
               <Select
                 value={settings.profile_visibility}
                 onValueChange={(value: "public" | "friends_only" | "private") =>
@@ -355,18 +357,15 @@ export default function PrivacySettingsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="public">전체 공개</SelectItem>
-                  <SelectItem value="friends_only">친구만</SelectItem>
-                  <SelectItem value="private">비공개</SelectItem>
+                  <SelectItem value="public">{t("privacy.visibility_public")}</SelectItem>
+                  <SelectItem value="friends_only">{t("privacy.visibility_friends")}</SelectItem>
+                  <SelectItem value="private">{t("privacy.visibility_private")}</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-gray-600">
-                {settings.profile_visibility === "public" &&
-                  "모든 사용자가 내 프로필을 검색할 수 있습니다"}
-                {settings.profile_visibility === "friends_only" &&
-                  "친구만 내 프로필을 확인할 수 있습니다"}
-                {settings.profile_visibility === "private" &&
-                  "아무도 내 프로필을 검색할 수 없습니다"}
+                {settings.profile_visibility === "public" && t("privacy.visibility_desc_public")}
+                {settings.profile_visibility === "friends_only" && t("privacy.visibility_desc_friends")}
+                {settings.profile_visibility === "private" && t("privacy.visibility_desc_private")}
               </p>
             </div>
 
@@ -374,10 +373,8 @@ export default function PrivacySettingsPage() {
 
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <Label className="text-sm font-medium">온라인 상태 표시</Label>
-                <p className="text-xs text-gray-600">
-                  다른 사용자에게 온라인 상태 및 최근 접속 시간 공개
-                </p>
+                <Label className="text-sm font-medium">{t("privacy.online_status")}</Label>
+                <p className="text-xs text-gray-600">{t("privacy.online_status_desc")}</p>
               </div>
               <Switch
                 checked={settings.show_online_status}
@@ -389,10 +386,7 @@ export default function PrivacySettingsPage() {
             </div>
 
             <div className="bg-blue-50 p-3 rounded-lg">
-              <p className="text-xs text-blue-700">
-                <strong>온라인 상태 표시</strong>를 끄면 최근 접속 시간도 함께
-                숨겨집니다.
-              </p>
+              <p className="text-xs text-blue-700">{t("privacy.online_status_tip")}</p>
             </div>
 
             {/* 개발 정보 (개발 중에만 표시) */}

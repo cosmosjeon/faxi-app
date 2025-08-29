@@ -42,10 +42,12 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase/client";
 import { useRealtimeDataSync } from "@/hooks/useRealtimeDataSync";
 import { FriendListSkeleton } from "@/components/ui/friend-skeleton";
+import { useTranslation } from "@/lib/i18n/LanguageProvider";
  
 
 export default function FriendsPage() {
   const { profile } = useAuthStore();
+  const { t } = useTranslation();
   const [friends, setFriends] = useState<FriendWithProfile[]>([]);
   const [closeFriendRequests, setCloseFriendRequests] = useState<any[]>([]);
   const [sentCloseFriendRequests, setSentCloseFriendRequests] = useState<any[]>(
@@ -167,11 +169,7 @@ export default function FriendsPage() {
       if (process.env.NODE_ENV !== 'production') console.log("✅ 친한친구 상태 맵 업데이트 완료:", closeFriendStatusMap);
     } catch (error) {
       console.error("친구 목록 로드 실패:", error);
-      toast({
-        title: "로드 실패",
-        description: "친구 목록을 불러오는데 실패했습니다.",
-        variant: "destructive",
-      });
+      toast({ title: t("common.loadFailed"), description: t("friends.loadFailedDesc"), variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -553,7 +551,7 @@ export default function FriendsPage() {
             borderColor: "border-red-200",
             bgColor: "bg-red-50",
             icon: <Heart size={12} className="text-red-500 fill-current" />,
-            statusText: "서로 친한친구예요",
+            statusText: t("friends.closeFriendBadge"),
             statusColor: "text-red-600",
           };
         case "sent_request":
@@ -561,7 +559,7 @@ export default function FriendsPage() {
             borderColor: "border-orange-200",
             bgColor: "bg-orange-50",
             icon: <Clock size={12} className="text-orange-500" />,
-            statusText: "친한친구 신청 대기중",
+            statusText: t("friends.pendingCount", { count: 1 }).replace(/\D/g, "") ? t("friends.pendingCount", { count: 1 }) : t("common.pending"),
             statusColor: "text-orange-600",
           };
 
@@ -588,14 +586,14 @@ export default function FriendsPage() {
                 disabled={isUpdating}
                 className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded transition-colors duration-200"
               >
-                해제
+                {t("friends.closeRemove")}
               </button>
               <button
                 onClick={() => handleDeleteFriend(friend.friend_id)}
                 disabled={isUpdating}
                 className="px-2 py-1 text-xs text-red-600 hover:bg-red-100 rounded transition-colors duration-200"
               >
-                삭제
+                {t("common.delete")}
               </button>
             </div>
           );
@@ -607,7 +605,7 @@ export default function FriendsPage() {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-orange-700 hover:bg-orange-100 rounded-md transition-colors duration-200 whitespace-nowrap"
             >
               <X size={14} />
-              신청 취소
+              {t("friends.cancelRequest")}
             </button>
           );
 
@@ -617,7 +615,7 @@ export default function FriendsPage() {
               <button
                 onClick={() => handleSendCloseFriendRequest(friend.friend_id)}
                 disabled={isUpdating}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors duration-200 border whitespace-nowrap ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs sm:text-sm rounded-md transition-colors duration-200 border whitespace-nowrap ${
                   isUpdating
                     ? "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
                     : "border-gray-200 text-gray-700 hover:bg-gray-100"
@@ -627,7 +625,7 @@ export default function FriendsPage() {
                   size={14}
                   className={isUpdating ? "text-gray-300" : "text-gray-400"}
                 />
-                {isUpdating ? "처리 중..." : "친한친구 되기"}
+                {isUpdating ? t("common.loading") : t("friends.becomeCloseShort")}
               </button>
               <button
                 onClick={() => handleDeleteFriend(friend.friend_id)}
@@ -638,7 +636,7 @@ export default function FriendsPage() {
                     : "text-red-600 hover:bg-red-100"
                 }`}
               >
-                삭제
+                {t("common.delete")}
               </button>
             </div>
           );
@@ -729,22 +727,15 @@ export default function FriendsPage() {
         {/* 헤더 */}
         <div className="bg-white rounded-lg px-4 py-3 shadow-sm flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 leading-tight">친구 목록</h1>
+            <h1 className="text-xl font-semibold text-gray-900 leading-tight">{t("friends.title")}</h1>
             <p className="text-gray-600 mt-0.5">
-              총 {acceptedCount}명 · 친한친구 {closeFriendsCount}명
-              {closeFriendRequestsCount > 0 &&
-                ` · 친한친구 신청 ${closeFriendRequestsCount}개`}
-              {sentCloseFriendRequestsCount > 0 &&
-                ` · 친한친구 대기 ${sentCloseFriendRequestsCount}개`}
-              {receivedRequestsCount > 0 &&
-                ` · 친구 요청 ${receivedRequestsCount}개`}
-              {sentRequestsCount > 0 && ` · 보낸 요청 ${sentRequestsCount}개`}
+              {t("friends.headerSummary", { total: acceptedCount, close: closeFriendsCount })}
             </p>
           </div>
           <Link href="/friends/add">
             <Button size="sm" className="gap-2">
               <UserPlus size={16} />
-              추가
+              {t("friends.add.cta")}
             </Button>
           </Link>
         </div>
@@ -757,7 +748,7 @@ export default function FriendsPage() {
                 <Search size={20} className="text-gray-500" />
                 <input
                   type="text"
-                  placeholder="친구 검색..."
+                  placeholder={t("friends.searchPlaceholder")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="bg-transparent flex-1 outline-none text-gray-700"
@@ -781,11 +772,10 @@ export default function FriendsPage() {
                 <div className="space-y-4">
                   <div className="space-y-1">
                     <h3 className="text-lg font-semibold text-gray-900">
-                      친한친구 신청
+                      {t("friends.closeRequests")}
                     </h3>
                     <p className="text-sm text-gray-600">
-                      새로운 친한친구 신청이 있어요 (
-                      {closeFriendRequests.length}개)
+                      {t("friends.closeRequestsDesc", { count: closeFriendRequests.length })}
                     </p>
                     <div className="h-px bg-gray-200 mt-3"></div>
                   </div>
@@ -819,7 +809,7 @@ export default function FriendsPage() {
                             <div className="flex items-center gap-1 mt-1">
                               <Mail size={12} className="text-blue-500" />
                               <span className="text-xs text-blue-600">
-                                친한친구 신청을 보냈어요
+                                {t("friends.sentCloseRequest")}
                               </span>
                             </div>
                           </div>
@@ -832,7 +822,7 @@ export default function FriendsPage() {
                             }
                             className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors"
                           >
-                            수락
+                            {t("common.accept")}
                           </button>
                           <button
                             onClick={() =>
@@ -840,7 +830,7 @@ export default function FriendsPage() {
                             }
                             className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
                           >
-                            거절
+                            {t("common.decline")}
                           </button>
                         </div>
                       </div>
@@ -853,13 +843,11 @@ export default function FriendsPage() {
               {acceptedFriends.length > 0 && (
                 <div className="space-y-4">
                   <div className="space-y-1">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      내 친구들
-                    </h3>
+                    <h3 className="text-lg font-semibold text-gray-900">{t("friends.myFriends")}</h3>
                     <p className="text-sm text-gray-600">
                       {searchQuery
-                        ? `${acceptedFriends.length}명 검색됨`
-                        : `총 ${acceptedCount}명 · 친한친구 ${closeFriendsCount}명`}
+                        ? t("friends.searchResultCount", { count: acceptedFriends.length })
+                        : t("friends.totalSummary", { total: acceptedCount, close: closeFriendsCount })}
                     </p>
                     <div className="h-px bg-gray-200 mt-3"></div>
                   </div>
@@ -878,13 +866,13 @@ export default function FriendsPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <UserPlus size={20} />
-                      받은 친구 요청
+                      {t("friends.receivedRequests")}
                       <Badge variant="secondary">
-                        {receivedRequests.length}개
+                        {t("friends.countSuffix", { count: receivedRequests.length })}
                       </Badge>
                     </CardTitle>
                     <CardDescription>
-                      친구 요청을 수락하거나 거절할 수 있습니다
+                      {t("friends.receivedRequestsDesc")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -914,7 +902,7 @@ export default function FriendsPage() {
                             <div className="flex items-center gap-1 mt-1">
                               <UserPlus size={12} className="text-blue-500" />
                               <span className="text-xs text-blue-600">
-                                친구 요청을 보냈어요
+                                {t("friends.receivedRequestsDesc")}
                               </span>
                             </div>
                           </div>
@@ -927,7 +915,7 @@ export default function FriendsPage() {
                             disabled={updatingFriendIds.has(friend.id)}
                             className="bg-gray-900 text-white hover:bg-gray-800"
                           >
-                            수락
+                            {t("common.accept")}
                           </Button>
                           <Button
                             size="sm"
@@ -936,7 +924,7 @@ export default function FriendsPage() {
                             disabled={updatingFriendIds.has(friend.id)}
                             className="text-gray-700 hover:bg-gray-100"
                           >
-                            거절
+                            {t("common.decline")}
                           </Button>
                         </div>
                       </div>
@@ -951,13 +939,13 @@ export default function FriendsPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <UserPlus size={20} />
-                      보낸 친구 요청
+                      {t("friends.sentRequests")}
                       <Badge variant="outline">
-                        {sentRequests.length}개 대기중
+                        {t("friends.pendingCount", { count: sentRequests.length })}
                       </Badge>
                     </CardTitle>
                     <CardDescription>
-                      상대방의 응답을 기다리고 있습니다
+                      {t("friends.sentRequestsDesc")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -982,7 +970,7 @@ export default function FriendsPage() {
                               {friend.friend_profile.display_name}
                             </h3>
                             <Badge variant="outline" className="text-xs">
-                              대기중
+                              {t("common.pending")}
                             </Badge>
                           </div>
                           <p className="text-sm text-gray-500">
@@ -999,7 +987,7 @@ export default function FriendsPage() {
                             disabled={updatingFriendIds.has(friend.id)}
                             className="text-gray-500 hover:text-red-600"
                           >
-                            취소
+                            {t("common.cancel")}
                           </Button>
                         </div>
                       </div>
@@ -1030,17 +1018,17 @@ export default function FriendsPage() {
         {!isLoading && friends.length === 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>내 친구들</CardTitle>
-              <CardDescription>총 0명의 친구가 있습니다</CardDescription>
+              <CardTitle>{t("friends.myFriends")}</CardTitle>
+              <CardDescription>{t("friends.zeroStateDesc")}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="text-center py-8 text-gray-500">
                 <div className="text-4xl mb-4">👥</div>
-                <p>아직 친구가 없습니다</p>
-                <p className="text-sm mt-2">ID 검색으로 친구를 추가해보세요!</p>
+                <p>{t("friends.noFriends")}</p>
+                <p className="text-sm mt-2">{t("friends.addByIdCta")}</p>
                 <Link href="/friends/add">
                   <Button className="mt-4 gap-2">
-                    <UserPlus size={16} />첫 번째 친구 추가하기
+                    <UserPlus size={16} />{t("friends.add.cta")}
                   </Button>
                 </Link>
               </div>

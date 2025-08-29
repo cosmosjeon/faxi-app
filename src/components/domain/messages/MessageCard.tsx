@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import Image from "next/image";
 import { formatDistanceToNow } from "date-fns";
-import { ko } from "date-fns/locale";
+import { useTranslation } from "@/lib/i18n/LanguageProvider";
 import { Check, X, Image as ImageIcon } from "lucide-react";
 import {
   Card,
@@ -39,6 +39,7 @@ type MessageCardProps =
 export const MessageCard = React.memo(function MessageCard(
   props: MessageCardProps
 ) {
+  const { dateLocale, localeCode, t } = useTranslation();
   const variant = props.variant ?? "full";
   // 시간 포맷팅 메모이제이션
   const formattedTime = useMemo(() => {
@@ -51,10 +52,10 @@ export const MessageCard = React.memo(function MessageCard(
     if (diffInHours < 24) {
       return formatDistanceToNow(messageTime, {
         addSuffix: true,
-        locale: ko,
+        locale: dateLocale,
       });
     } else {
-      return messageTime.toLocaleString("ko-KR", {
+      return messageTime.toLocaleString(localeCode, {
         month: "short",
         day: "numeric",
         hour: "2-digit",
@@ -79,7 +80,7 @@ export const MessageCard = React.memo(function MessageCard(
   if (variant === "preview") {
     const { message, isProcessing, onAccept, onReject } = props;
     const senderNamePreview =
-      (message as any)?.sender_profile?.display_name || "알 수 없는 사용자";
+      (message as any)?.sender_profile?.display_name || t("profile.unknown_user");
     const avatarUrlPreview = (message as any)?.sender_profile?.avatar_url || "";
     return (
       <Card className="w-full transition-shadow hover:shadow-md">
@@ -96,19 +97,19 @@ export const MessageCard = React.memo(function MessageCard(
                 <CardTitle className="text-sm font-medium text-gray-900">
                   {senderNamePreview}
                 </CardTitle>
-                <CardDescription className="text-xs text-gray-500" aria-label="메시지 미리보기">
-                  LCD 티저 미리보기
+                <CardDescription className="text-xs text-gray-500" aria-label={t("messages.preview")}>
+                  {t("messages.preview")}
                 </CardDescription>
               </div>
             </div>
             <Badge variant="secondary" className="text-xs">
-              {message.lcd_teaser || "새 메시지"}
+              {message.lcd_teaser || t("messages.new")}
             </Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="bg-gray-900 text-green-400 font-mono text-sm p-2 rounded text-center">
-            &quot;{message.lcd_teaser || "새 메시지"}&quot;
+            &quot;{message.lcd_teaser || t("messages.new")}&quot;
           </div>
           <div className="flex justify-end space-x-2 pt-2">
             <Button
@@ -119,7 +120,7 @@ export const MessageCard = React.memo(function MessageCard(
               className="text-red-600 hover:text-red-700 hover:bg-red-50"
             >
               <X size={16} className="mr-1" />
-              거절
+              {t("messages.reject")}
             </Button>
             <Button
               size="sm"
@@ -128,7 +129,7 @@ export const MessageCard = React.memo(function MessageCard(
               className="bg-blue-600 hover:bg-blue-700"
             >
               <Check size={16} className="mr-1" />
-              프린트
+              {t("messages.print")}
             </Button>
           </div>
         </CardContent>
@@ -161,7 +162,7 @@ export const MessageCard = React.memo(function MessageCard(
             </div>
           </div>
           <Badge variant="secondary" className="text-xs">
-            {message.lcd_teaser || "새 메시지"}
+            {message.lcd_teaser || t("messages.new")}
           </Badge>
         </div>
       </CardHeader>
@@ -190,7 +191,7 @@ export const MessageCard = React.memo(function MessageCard(
             <div className="absolute top-2 right-2">
               <Badge variant="secondary" className="text-xs">
                 <ImageIcon size={12} className="mr-1" />
-                이미지
+                {t("messages.image")}
               </Badge>
             </div>
           </div>
@@ -206,7 +207,7 @@ export const MessageCard = React.memo(function MessageCard(
             className="text-red-600 hover:text-red-700 hover:bg-red-50"
           >
             <X size={16} className="mr-1" />
-            거절
+            {t("messages.reject")}
           </Button>
           <Button
             size="sm"
@@ -215,7 +216,7 @@ export const MessageCard = React.memo(function MessageCard(
             className="bg-blue-600 hover:bg-blue-700"
           >
             <Check size={16} className="mr-1" />
-            프린트
+            {t("messages.print")}
           </Button>
         </div>
       </CardContent>

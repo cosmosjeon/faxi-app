@@ -19,11 +19,13 @@ import type {
   NotificationSettings,
   UserSettings,
 } from "@/features/settings/types";
+import { useTranslation } from "@/lib/i18n/LanguageProvider";
 
 export default function NotificationSettingsPage() {
   const router = useRouter();
   const { profile } = useAuthStore();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const { 
     setupPushNotifications, 
     canSetup, 
@@ -95,8 +97,8 @@ export default function NotificationSettingsPage() {
       } catch (error) {
         console.error("❌ 설정 로드 실패:", error);
         toast({
-          title: "설정 로드 실패",
-          description: "알림 설정을 불러오는데 실패했습니다.",
+          title: t("notifications.load_failed"),
+          description: t("notifications.subtitle"),
           variant: "destructive",
         });
 
@@ -408,9 +410,9 @@ export default function NotificationSettingsPage() {
         <div className="max-w-md mx-auto">
           <Card>
             <CardContent className="p-6 text-center">
-              <p className="text-gray-600">설정을 불러올 수 없습니다.</p>
+              <p className="text-gray-600">{t("notifications.load_failed")}</p>
               <Button onClick={() => router.back()} className="mt-4">
-                돌아가기
+                {t("notifications.go_back")}
               </Button>
             </CardContent>
           </Card>
@@ -434,10 +436,8 @@ export default function NotificationSettingsPage() {
               <ArrowLeft size={20} />
             </Button>
             <div>
-              <h1 className="text-xl font-semibold text-gray-900 leading-tight">알림 설정</h1>
-              <p className="text-sm text-gray-600 mt-0.5">
-                알림 수신 방식을 설정하세요
-              </p>
+              <h1 className="text-xl font-semibold text-gray-900 leading-tight">{t("notifications.title")}</h1>
+              <p className="text-sm text-gray-600 mt-0.5">{t("notifications.subtitle")}</p>
             </div>
           </div>
         </div>
@@ -447,16 +447,14 @@ export default function NotificationSettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Bell size={20} />
-              알림 설정
+              {t("notifications.title")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <Label className="text-sm font-medium">전체 알림</Label>
-                <p className="text-xs text-gray-600">
-                  메시지, 친구 요청, 프린터 등 모든 알림 수신
-                </p>
+                <Label className="text-sm font-medium">{t("notifications.all")}</Label>
+                <p className="text-xs text-gray-600">{t("notifications.all_desc")}</p>
               </div>
               <Switch
                 checked={settings.message_notifications}
@@ -471,14 +469,12 @@ export default function NotificationSettingsPage() {
 
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <Label className="text-sm font-medium">푸시 알림</Label>
-                <p className="text-xs text-gray-600">
-                  앱이 백그라운드일 때 시스템 알림 표시
-                </p>
+                <Label className="text-sm font-medium">{t("notifications.push")}</Label>
+                <p className="text-xs text-gray-600">{t("notifications.all_desc")}</p>
               </div>
               <div className="space-y-2">
                 {isGranted ? (
-                  <div className="text-xs text-green-600">✅ 설정 완료</div>
+                  <div className="text-xs text-green-600">✅ {t("notifications.push_ready")}</div>
                 ) : canSetup ? (
                   <div className="space-y-2">
                     <Button
@@ -486,14 +482,14 @@ export default function NotificationSettingsPage() {
                       onClick={handlePushSetup}
                       disabled={!isSupported}
                     >
-                      {!isSupported ? "지원 안됨" : "설정하기"}
+                      {!isSupported ? t("notifications.push_not_supported") : t("notifications.push_setup")}
                     </Button>
                     <div className="text-xs text-blue-600">{pushSetupStatus}</div>
                   </div>
                 ) : permission === 'denied' ? (
-                  <div className="text-xs text-red-600">❌ 권한 거부됨</div>
+                  <div className="text-xs text-red-600">❌</div>
                 ) : (
-                  <div className="text-xs text-gray-500">로딩 중...</div>
+                  <div className="text-xs text-gray-500">{t("common.loading")}</div>
                 )}
               </div>
             </div>
@@ -502,10 +498,8 @@ export default function NotificationSettingsPage() {
 
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <Label className="text-sm font-medium">친한친구 자동출력</Label>
-                <p className="text-xs text-gray-600">
-                  친한친구 메시지를 승인 없이 자동으로 출력
-                </p>
+                <Label className="text-sm font-medium">{t("notifications.close_friend_auto_print")}</Label>
+                <p className="text-xs text-gray-600">{t("notifications.close_friend_auto_print_desc")}</p>
               </div>
               <Switch
                 checked={settings.auto_print_close_friends}
@@ -520,8 +514,8 @@ export default function NotificationSettingsPage() {
 
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <Label className="text-sm font-medium">마케팅 알림</Label>
-                <p className="text-xs text-gray-600">이벤트 및 프로모션 정보</p>
+                <Label className="text-sm font-medium">{t("notifications.marketing")}</Label>
+                <p className="text-xs text-gray-600">{t("notifications.marketing_desc")}</p>
               </div>
               <Switch
                 checked={settings.marketing_notifications}
@@ -533,10 +527,7 @@ export default function NotificationSettingsPage() {
             </div>
 
             <div className="bg-blue-50 p-3 rounded-lg">
-              <p className="text-xs text-blue-700">
-                <strong>알림 소리, 진동</strong>은 기기의 시스템 설정에서 조정할
-                수 있습니다.
-              </p>
+              <p className="text-xs text-blue-700">{t("notifications.system_tip")}</p>
             </div>
 
             {/* Firebase 상태 표시 (APK 디버깅용) */}

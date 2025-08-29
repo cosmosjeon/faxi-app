@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import type { FriendWithProfile } from "@/features/friends/types";
+import { useTranslation } from "@/lib/i18n/LanguageProvider";
 
 interface FriendCardProps {
   friend: FriendWithProfile;
@@ -27,12 +28,13 @@ export const FriendCard = React.memo(function FriendCard({
   onAcceptRequest,
   onRejectRequest,
 }: FriendCardProps) {
+  const { t } = useTranslation();
   // 친구 이름 메모이제이션
   const friendName = useMemo(() => {
     return (
       friend.friend_profile?.display_name ||
       friend.friend_profile?.username ||
-      "알 수 없는 사용자"
+      t("profile.unknown_user")
     );
   }, [friend.friend_profile]);
 
@@ -51,7 +53,7 @@ export const FriendCard = React.memo(function FriendCard({
             className="text-xs bg-green-100 text-green-800"
           >
             <UserCheck size={12} className="mr-1" />
-            친구
+            {t("friends.mutual")}
           </Badge>
         );
       case "pending":
@@ -61,7 +63,7 @@ export const FriendCard = React.memo(function FriendCard({
             className="text-xs bg-yellow-100 text-yellow-800"
           >
             <Clock size={12} className="mr-1" />
-            대기중
+            {t("friends.pendingCount", { count: 1 }).replace(/\D/g, "") ? t("friends.pendingCount", { count: 1 }) : t("common.pending")}
           </Badge>
         );
       default:
@@ -95,7 +97,7 @@ export const FriendCard = React.memo(function FriendCard({
                     className="text-xs bg-pink-100 text-pink-800"
                   >
                     <Heart size={12} className="mr-1" />
-                    친한친구
+                    {t("friends.closeFriendBadge")}
                   </Badge>
                 )}
               </div>
@@ -114,7 +116,7 @@ export const FriendCard = React.memo(function FriendCard({
               <>
                 {/* 친한 친구 토글 */}
                 <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600">친한친구</span>
+                  <span className="text-sm text-gray-600">{t("friends.closeFriendBadge")}</span>
                   <Switch
                     checked={friend.is_close_friend}
                     onCheckedChange={handleCloseFriendToggle}
@@ -150,7 +152,7 @@ export const FriendCard = React.memo(function FriendCard({
 
             {friend.status === "pending" && !friend.is_received_request && (
               <Badge variant="outline" className="text-xs">
-                요청됨
+                {t("friends.sentRequests")}
               </Badge>
             )}
           </div>

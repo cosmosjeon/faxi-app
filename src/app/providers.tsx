@@ -6,6 +6,7 @@ import { AuthProvider } from "@/components/auth-provider";
 import { RealtimeProvider } from "@/components/RealtimeProvider";
 import { PushNotificationInitializer } from "@/components/PushNotificationInitializer";
 import { useEffect, useState } from "react";
+import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
 
 // QueryClient 기본 설정
 const queryClientOptions = {
@@ -36,9 +37,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <RealtimeProvider>
-          {children}
-        </RealtimeProvider>
+        <LanguageProvider>
+          <RealtimeProvider>
+            {children}
+          </RealtimeProvider>
+        </LanguageProvider>
         <Toaster />
         <PushNotificationInitializer />
       </AuthProvider>

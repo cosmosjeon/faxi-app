@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/lib/i18n/LanguageProvider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ImageEditor } from "@/components/domain/image/ImageEditor";
 import { useBlePrinter } from "@/hooks/useBlePrinter";
@@ -13,6 +14,7 @@ export default function PhotoEditPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const printer = useBlePrinter();
+  const { t } = useTranslation();
 
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -89,7 +91,7 @@ export default function PhotoEditPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500">로딩 중...</div>
+        <div className="text-gray-500">{t("common.loading")}</div>
       </div>
     );
   }
@@ -108,10 +110,8 @@ export default function PhotoEditPage() {
             <ArrowLeft size={20} />
           </Button>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 leading-tight">사진 편집</h1>
-            <p className="text-sm text-gray-600 mt-0.5">
-              사진을 편집하고 저장하세요
-            </p>
+            <h1 className="text-xl font-semibold text-gray-900 leading-tight">{t("photo.editTitle")}</h1>
+            <p className="text-sm text-gray-600 mt-0.5">{t("photo.editSubtitle")}</p>
           </div>
         </div>
 
@@ -119,7 +119,7 @@ export default function PhotoEditPage() {
         {!selectedImage ? (
           <Card>
             <CardHeader>
-              <CardTitle>사진 선택</CardTitle>
+              <CardTitle>{t("photo.pickTitle")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-8">
@@ -138,12 +138,8 @@ export default function PhotoEditPage() {
                     <span className="text-2xl">📷</span>
                   </div>
                   <div className="text-center">
-                    <p className="font-medium text-gray-900">
-                      편집할 사진을 선택하세요
-                    </p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      JPG, PNG 파일 (최대 5MB)
-                    </p>
+                    <p className="font-medium text-gray-900">{t("photo.pickPrompt")}</p>
+                    <p className="text-sm text-gray-500 mt-1">{t("photo.pickHint")}</p>
                   </div>
                 </label>
               </div>

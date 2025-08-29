@@ -40,6 +40,7 @@ import {
 import { useBlePrinter } from "@/hooks/useBlePrinter";
 import { toast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/stores/auth.store";
+import { useTranslation } from "@/lib/i18n/LanguageProvider";
 import {
   getQueuedMessages,
   updateMessagePrintStatus,
@@ -50,6 +51,7 @@ export default function PrinterPage() {
   const printer = useBlePrinter();
   const { profile } = useAuthStore();
   const [textOnly, setTextOnly] = useState("");
+  const { t } = useTranslation();
   
   // 무한 프린트 반복 방지를 위한 플래그
   const [hasHandledQueuedMessages, setHasHandledQueuedMessages] = useState(false);
@@ -79,15 +81,15 @@ export default function PrinterPage() {
   const getStatusText = () => {
     switch (printer.status) {
       case "connected":
-        return "연결됨";
+        return t("printer.connectedShort");
       case "connecting":
-        return "연결 중...";
+        return t("printer.connecting");
       case "printing":
-        return "프린트 중...";
+        return t("printer.printing");
       case "error":
-        return "오류";
+        return t("printer.error");
       default:
-        return "연결 안됨";
+        return t("printer.disconnected");
     }
   };
 
@@ -299,10 +301,8 @@ export default function PrinterPage() {
       <div className="max-w-md mx-auto space-y-4">
         {/* 헤더 */}
         <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
-          <h1 className="text-xl font-semibold text-gray-900 leading-tight mb-1">
-            프린터 관리 🖨️
-          </h1>
-          <p className="text-gray-600">BLE 프린터를 연결하고 관리하세요</p>
+          <h1 className="text-xl font-semibold text-gray-900 leading-tight mb-1">{t("printer.title")}</h1>
+          <p className="text-gray-600">{t("printer.subtitle")}</p>
         </div>
 
         {/* BLE 지원 여부 */}
@@ -312,10 +312,8 @@ export default function PrinterPage() {
               <div className="flex items-center gap-2 text-red-700">
                 <AlertTriangle size={20} />
                 <div>
-                  <p className="font-medium">Web Bluetooth 미지원</p>
-                  <p className="text-sm text-red-600">
-                    Chrome 브라우저를 사용하거나 안드로이드 앱을 다운로드하세요.
-                  </p>
+                  <p className="font-medium">{t("printer.webBluetoothUnsupportedTitle")}</p>
+                  <p className="text-sm text-red-600">{t("printer.webBluetoothUnsupportedDesc")}</p>
                 </div>
               </div>
             </CardContent>
@@ -326,16 +324,14 @@ export default function PrinterPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              <span>연결 상태</span>
+              <span>{t("printer.connectionStatus")}</span>
               {getStatusIcon()}
             </CardTitle>
-            <CardDescription>
-              현재 프린터 연결 상태를 확인하세요
-            </CardDescription>
+            <CardDescription>{t("printer.connectionStatusDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">상태:</span>
+              <span className="text-sm font-medium">{t("printer.status")}</span>
               <span className={`text-sm font-medium ${getStatusColor()}`}>
                 {getStatusText()}
               </span>
@@ -346,7 +342,7 @@ export default function PrinterPage() {
                 <Separator />
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm">프린터 이름:</span>
+                    <span className="text-sm">{t("printer.deviceName")}</span>
                     <span className="text-sm font-medium">
                       {printer.connectedPrinter.name}
                     </span>
@@ -357,7 +353,7 @@ export default function PrinterPage() {
                       <div className="flex items-center justify-between">
                         <span className="text-sm flex items-center gap-1">
                           <Battery size={14} />
-                          배터리:
+                          {t("printer.battery")}
                         </span>
                         <span className="text-sm font-medium">
                           {printer.connectedPrinter.batteryLevel}%
@@ -372,7 +368,7 @@ export default function PrinterPage() {
 
                   {printer.connectedPrinter.paperStatus && (
                     <div className="flex items-center justify-between">
-                      <span className="text-sm">용지 상태:</span>
+                      <span className="text-sm">{t("printer.paperStatus")}</span>
                       {getPaperStatusBadge(
                         printer.connectedPrinter.paperStatus
                       )}
@@ -391,7 +387,7 @@ export default function PrinterPage() {
                   onClick={printer.clearError}
                   className="mt-2"
                 >
-                  오류 지우기
+                  {t("printer.clearError")}
                 </Button>
               </div>
             )}
@@ -409,12 +405,12 @@ export default function PrinterPage() {
                         className="mr-2 animate-spin"
                         size={16}
                       />
-                      연결 중...
+                      {t("printer.connecting")}
                     </>
                   ) : (
                     <>
                       <Power className="mr-2" size={16} />
-                      프린터 연결
+                      {t("printer.connect")}
                     </>
                   )}
                 </Button>
@@ -425,7 +421,7 @@ export default function PrinterPage() {
                   className="flex-1"
                 >
                   <PowerOff className="mr-2" size={16} />
-                  연결 해제
+                  {t("printer.disconnect")}
                 </Button>
               )}
             </div>
@@ -516,14 +512,14 @@ export default function PrinterPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText size={20} />
-              텍스트만 프린트
+              {t("printer.textOnly")}
             </CardTitle>
-            <CardDescription>간단한 문구를 바로 출력합니다</CardDescription>
+            <CardDescription>{t("printer.textOnlyDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Textarea
               rows={4}
-              placeholder="출력할 텍스트를 입력하세요 (한글은 일부 프린터에서 제한될 수 있습니다)"
+              placeholder={t("printer.textPlaceholder")}
               value={textOnly}
               onChange={(e) => setTextOnly(e.target.value)}
               maxLength={200}
@@ -531,7 +527,7 @@ export default function PrinterPage() {
             <div className="flex justify-end">
               <Button onClick={handleTextOnlyPrint} disabled={!printer.isConnected || !textOnly.trim()}>
                 <Printer className="mr-2" size={16} />
-                텍스트 출력
+                {t("printer.printText")}
               </Button>
             </div>
           </CardContent>
@@ -549,7 +545,7 @@ export default function PrinterPage() {
                 className="w-full h-auto flex-col gap-2"
               >
                 <FileText size={24} />
-                <span className="text-sm">테스트 프린트</span>
+                <span className="text-sm">{t("printer.testPrint")}</span>
               </Button>
             </CardContent>
           </Card>
@@ -564,7 +560,7 @@ export default function PrinterPage() {
                 className="w-full h-auto flex-col gap-2"
               >
                 <Camera size={24} />
-                <span className="text-sm">개인 사진 프린트</span>
+                <span className="text-sm">{t("printer.myPhotoPrint")}</span>
               </Button>
             </CardContent>
           </Card>

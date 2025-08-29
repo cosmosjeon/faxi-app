@@ -23,6 +23,7 @@ export interface PrivacySettings {
 export interface UserSettings extends NotificationSettings, PrivacySettings {
   user_id: string;
   retro_effects_enabled: boolean; // 기존 필드
+  language: "ko" | "en"; // 앱 언어
   created_at: string;
   updated_at: string;
 }

@@ -20,10 +20,12 @@ import { searchUserByUsername, addFriend, getFriendshipStatus } from "@/features
 import type { SearchResult } from "@/features/friends/types";
 import { toast } from "@/hooks/use-toast";
 import { friendToasts } from "@/lib/toasts";
+import { useTranslation } from "@/lib/i18n/LanguageProvider";
 
 export default function AddFriendPage() {
   const router = useRouter();
   const { profile } = useAuthStore();
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -141,8 +143,8 @@ export default function AddFriendPage() {
             <ArrowLeft size={20} />
           </Button>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 leading-tight">친구 추가</h1>
-            <p className="text-gray-600 text-sm mt-0.5">ID로 친구를 찾아보세요</p>
+            <h1 className="text-xl font-semibold text-gray-900 leading-tight">{t("friends.add.title")}</h1>
+            <p className="text-gray-600 text-sm mt-0.5">{t("friends.add.subtitle")}</p>
           </div>
         </div>
 
@@ -151,16 +153,16 @@ export default function AddFriendPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Search size={20} />
-              사용자 검색
+              {t("friends.add.searchTitle")}
             </CardTitle>
             <CardDescription>
-              사용자명 또는 표시 이름으로 검색하세요
+              {t("friends.add.searchDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex gap-2">
               <Input
-                placeholder="예: alice, 앨리스"
+                placeholder={t("friends.add.placeholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={handleKeyPress}
@@ -187,7 +189,7 @@ export default function AddFriendPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users size={20} />
-                검색 결과 ({searchResults.length}명)
+                {t("friends.add.results", { count: searchResults.length })}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -213,7 +215,7 @@ export default function AddFriendPage() {
                       </h3>
                       {getStatusBadge(result.friendship_status)}
                       {result.is_mutual && (
-                        <Badge variant="outline">맞팔</Badge>
+                        <Badge variant="outline">{t("friends.mutual")}</Badge>
                       )}
                     </div>
                     <p className="text-sm text-gray-600">
@@ -226,11 +228,11 @@ export default function AddFriendPage() {
                     onClick={() => handleAddFriend(result.user.id)}
                     disabled={result.friendship_status !== "none"}
                     loading={addingFriendIds.has(result.user.id)}
-                    loadingText="추가 중..."
+                    loadingText={t("common.adding")}
                     className="gap-1"
                   >
                     <UserPlus size={14} />
-                    추가
+                    {t("common.add")}
                   </LoadingButton>
                 </div>
               ))}
@@ -243,10 +245,8 @@ export default function AddFriendPage() {
           <Card>
             <CardContent className="p-8 text-center">
               <div className="text-4xl mb-4">🔍</div>
-              <p className="text-gray-600 mb-2">검색 결과가 없습니다</p>
-              <p className="text-sm text-gray-500">
-                다른 사용자명으로 검색해보세요
-              </p>
+              <p className="text-gray-600 mb-2">{t("common.noSearchResults")}</p>
+              <p className="text-sm text-gray-500">{t("friends.add.noResultsDesc")}</p>
             </CardContent>
           </Card>
         )}
@@ -256,10 +256,8 @@ export default function AddFriendPage() {
           <Card>
             <CardContent className="p-8 text-center">
               <div className="text-4xl mb-4">👥</div>
-              <p className="text-gray-600 mb-2">친구를 찾아보세요</p>
-              <p className="text-sm text-gray-500">
-                사용자명을 입력하고 검색 버튼을 눌러보세요
-              </p>
+              <p className="text-gray-600 mb-2">{t("friends.add.hintTitle")}</p>
+              <p className="text-sm text-gray-500">{t("friends.add.hintDesc")}</p>
             </CardContent>
           </Card>
         )}

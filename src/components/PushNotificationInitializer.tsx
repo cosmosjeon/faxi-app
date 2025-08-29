@@ -26,7 +26,7 @@ export function PushNotificationInitializer() {
       };
 
       const twaEnv = isTWA();
-      console.log('[PushInit] 환경:', twaEnv ? 'TWA' : '웹브라우저');
+      console.log('[PushInit] 환경:', twaEnv ? 'TWA' : 'Web');
 
       // 브라우저 지원 여부 확인
       const isSupported = 
@@ -34,14 +34,14 @@ export function PushNotificationInitializer() {
         'serviceWorker' in navigator;
       
       if (!isSupported) {
-        console.warn('[PushInit] 푸시 알림 미지원 환경');
+        console.warn('[PushInit] Push not supported environment');
         return;
       }
 
       try {
         // TWA 환경에서는 DOM 완전 로딩 대기
         if (twaEnv) {
-          console.log('[PushInit] TWA 환경: DOM 로딩 대기');
+          console.log('[PushInit] TWA: wait for DOM ready');
           await new Promise(resolve => {
             if (document.readyState === 'complete') {
               resolve(undefined);
@@ -54,12 +54,12 @@ export function PushNotificationInitializer() {
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
-        console.log('[PushInit] Service Worker 등록 시작');
+        console.log('[PushInit] Registering Service Worker');
         // Service Worker 등록
         const registered = await registerServiceWorker();
         
         if (registered) {
-          console.log('[PushInit] Service Worker 등록 성공, 포그라운드 리스너 설정');
+          console.log('[PushInit] Service Worker registered. Setting up foreground listener');
           
           // TWA 환경에서는 약간의 지연 후 포그라운드 메시지 설정
           if (twaEnv) {
@@ -74,10 +74,10 @@ export function PushNotificationInitializer() {
             });
           }
         } else {
-          console.warn('[PushInit] Service Worker 등록 실패');
+          console.warn('[PushInit] Failed to register Service Worker');
         }
       } catch (error) {
-        console.error('[PushInit] 푸시 알림 초기화 오류:', error);
+        console.error('[PushInit] Push initialization error:', error);
       }
     };
 
@@ -85,33 +85,33 @@ export function PushNotificationInitializer() {
     const attemptAutoTokenRegistration = async () => {
       // 로그인되지 않은 경우 스킵
       if (!user) {
-        console.log('[PushInit] 사용자 미로그인, 자동 토큰 등록 스킵');
+        console.log('[PushInit] User not logged in. Skip auto token registration');
         return;
       }
 
       // 이미 시도한 경우 스킵 (최초 1회만)
       const hasAttempted = localStorage.getItem(`push-auto-setup-${user.id}`);
       if (hasAttempted) {
-        console.log('[PushInit] 이미 자동 토큰 등록 시도됨, 스킵');
+        console.log('[PushInit] Auto token registration already attempted. Skip');
         return;
       }
 
       // 브라우저 지원 확인
       const isSupported = 'Notification' in window && 'serviceWorker' in navigator;
       if (!isSupported) {
-        console.log('[PushInit] 푸시 알림 미지원 환경, 자동 등록 스킵');
+        console.log('[PushInit] Push not supported. Skip auto registration');
         return;
       }
 
       // 권한이 이미 거부된 경우 스킵
       if (Notification.permission === 'denied') {
-        console.log('[PushInit] 알림 권한 거부됨, 자동 등록 스킵');
+        console.log('[PushInit] Notification permission denied. Skip auto registration');
         localStorage.setItem(`push-auto-setup-${user.id}`, 'denied');
         return;
       }
 
       try {
-        console.log('[PushInit] 자동 토큰 등록 시도 시작');
+        console.log('[PushInit] Start auto token registration');
         
         // 자동 토큰 등록 시도
         const success = await setupPushNotifications();
@@ -120,12 +120,12 @@ export function PushNotificationInitializer() {
         localStorage.setItem(`push-auto-setup-${user.id}`, success ? 'success' : 'failed');
         
         if (success) {
-          console.log('[PushInit] ✅ 자동 토큰 등록 성공');
+          console.log('[PushInit] ✅ Auto token registration success');
         } else {
-          console.log('[PushInit] ❌ 자동 토큰 등록 실패');
+          console.log('[PushInit] ❌ Auto token registration failed');
         }
       } catch (error) {
-        console.error('[PushInit] 자동 토큰 등록 오류:', error);
+        console.error('[PushInit] Auto token registration error:', error);
         localStorage.setItem(`push-auto-setup-${user.id}`, 'error');
       }
     };
@@ -147,7 +147,7 @@ export function PushNotificationInitializer() {
   // 포그라운드 메시지 처리
   const handleForegroundMessage = (payload: any) => {
     if (process.env.NODE_ENV !== 'production') {
-      console.log('포그라운드 메시지 수신:', payload);
+      console.log('Foreground message:', payload);
     }
     
     // 메시지 타입별 처리
@@ -162,7 +162,7 @@ export function PushNotificationInitializer() {
         
       case 'close_friend_message':
         toast({
-          title: '친한친구 메시지',
+          title: 'Close friend message',
           description: payload.body,
           duration: 5000
         });
@@ -170,15 +170,15 @@ export function PushNotificationInitializer() {
         
       case 'auto_print_notification':
         toast({
-          title: '메시지 출력',
-          description: '친구의 프린터와 앱이 연결되어 있다면 즉시 출력합니다!',
+          title: 'Message printing',
+          description: 'Will print immediately if friend device is connected.',
           duration: 7000
         });
         break;
         
       case 'friend_request':
         toast({
-          title: '친구 요청',
+          title: 'Friend request',
           description: payload.body,
           duration: 7000
         });
@@ -186,7 +186,7 @@ export function PushNotificationInitializer() {
         
       case 'close_friend_request':
         toast({
-          title: '친한친구 요청',
+          title: 'Close friend request',
           description: payload.body,
           duration: 7000
         });

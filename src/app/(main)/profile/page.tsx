@@ -20,26 +20,29 @@ import {
   Shield,
   HelpCircle,
   ExternalLink,
+  Languages,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useTranslation } from "@/lib/i18n/LanguageProvider";
 
 export default function ProfilePage() {
   const router = useRouter();
   const { profile, signOut } = useAuthStore();
+  const { t } = useTranslation();
 
   const handleSignOut = async () => {
     try {
       await signOut();
       router.push("/login");
       toast({
-        title: "로그아웃 완료",
-        description: "성공적으로 로그아웃되었습니다.",
+        title: t("common.logout"),
+        description: t("profile.title"),
       });
     } catch (error) {
       console.error("로그아웃 실패:", error);
       toast({
-        title: "로그아웃 실패",
-        description: "로그아웃 중 오류가 발생했습니다.",
+        title: t("common.logout"),
+        description: "",
         variant: "destructive",
       });
     }
@@ -50,8 +53,8 @@ export default function ProfilePage() {
       <div className="max-w-md mx-auto space-y-4">
         {/* 헤더 */}
         <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
-          <h1 className="text-xl font-semibold text-gray-900 leading-tight">프로필</h1>
-          <p className="text-gray-600 mt-0.5">계정 정보와 설정을 관리하세요</p>
+          <h1 className="text-xl font-semibold text-gray-900 leading-tight">{t("profile.title")}</h1>
+          <p className="text-gray-600 mt-0.5">{t("profile.subtitle")}</p>
         </div>
 
         {/* 프로필 정보 */}
@@ -66,10 +69,10 @@ export default function ProfilePage() {
               </Avatar>
               <div className="flex-1">
                 <h2 className="text-lg font-semibold text-gray-900">
-                  {profile?.display_name || "사용자"}
+                  {profile?.display_name || t("profile.unknown_user")}
                 </h2>
                 <p className="text-gray-600">
-                  @{profile?.username || "username"}
+                  @{profile?.username || t("profile.username")}
                 </p>
               </div>
               <Button variant="outline" size="sm">
@@ -84,7 +87,7 @@ export default function ProfilePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Settings size={20} />
-              설정
+              {t("profile.menu")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -94,7 +97,7 @@ export default function ProfilePage() {
               onClick={() => router.push("/profile/notifications")}
             >
               <Bell size={16} />
-              알림 설정
+              {t("profile.notifications")}
             </Button>
             <Button
               variant="ghost"
@@ -102,7 +105,15 @@ export default function ProfilePage() {
               onClick={() => router.push("/profile/privacy")}
             >
               <Shield size={16} />
-              개인정보 설정
+              {t("profile.privacy")}
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3"
+              onClick={() => router.push("/profile/language")}
+            >
+              <Languages size={16} />
+              {t("language.title")}
             </Button>
             <Button
               variant="ghost"
@@ -117,10 +128,8 @@ export default function ProfilePage() {
               <div className="flex items-center gap-3">
                 <HelpCircle size={16} />
                 <div className="text-left">
-                  <div>도움말</div>
-                  <div className="text-xs text-gray-500">
-                    FAXI 홈페이지로 이동
-                  </div>
+                  <div>{t("profile.help")}</div>
+                  <div className="text-xs text-gray-500">{t("profile.help_sub")}</div>
                 </div>
               </div>
               <ExternalLink size={14} className="text-gray-400" />
@@ -131,15 +140,15 @@ export default function ProfilePage() {
         {/* 앱 정보 */}
         <Card>
           <CardHeader>
-            <CardTitle>앱 정보</CardTitle>
+            <CardTitle>{t("profile.app_info")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">버전</span>
+              <span className="text-gray-600">{t("common.version")}</span>
               <span>1.0.0 (MVP)</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">빌드</span>
+              <span className="text-gray-600">{t("common.build")}</span>
               <span>2025.01.29</span>
             </div>
           </CardContent>
@@ -152,7 +161,7 @@ export default function ProfilePage() {
           onClick={handleSignOut}
         >
           <LogOut size={16} />
-          로그아웃
+          {t("common.logout")}
         </Button>
       </div>
     </div>

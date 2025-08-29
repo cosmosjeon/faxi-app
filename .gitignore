@@ -73,3 +73,27 @@ public/firebase-config.js
 /faxi-twa/*.aab
 /faxi-twa/*.idsig
 /faxi-twa/android.keystore
+
+# Android build artifacts and generated files
+/faxi-twa/app/src/main/res/
+/faxi-twa/app/src/main/java/
+/faxi-twa/manifest-checksum.txt
+/faxi-twa/gradlew
+/faxi-twa/gradlew.bat
+/faxi-twa/gradle/wrapper/
+/faxi-twa/.gradle/
+/faxi-twa/local.properties
+/faxi-twa/app/local.properties
+
+# Android Studio
+/faxi-twa/.idea/
+/faxi-twa/app/.idea/
+/faxi-twa/*.iml
+/faxi-twa/app/*.iml
+
+# Android build outputs
+/faxi-twa/app/release/
+/faxi-twa/app/debug/
+/faxi-twa/app/build/intermediates/
+/faxi-twa/app/build/outputs/
+/faxi-twa/app/build/tmp/

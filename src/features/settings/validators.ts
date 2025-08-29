@@ -68,6 +68,7 @@ export function filterSafeFields(
     "retro_effects_enabled", 
     "message_notifications",
     "marketing_notifications",
+    "language",
   ];
 
   const privacyFields = [
@@ -75,6 +76,7 @@ export function filterSafeFields(
     "retro_effects_enabled",
     "profile_visibility",
     "show_online_status",
+    "language",
   ];
 
   const safeFields = fieldType === "notification" ? notificationFields : privacyFields;
