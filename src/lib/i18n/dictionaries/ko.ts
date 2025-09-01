@@ -159,7 +159,7 @@ const ko = {
     closeRemove: "해제",
     cancelRequest: "신청 취소",
     becomeClose: "친한친구 추가",
-    becomeCloseShort: "친추",
+    becomeCloseShort: "친친 걸기",
     add: { cta: "친구 추가하기", title: "친구 추가", subtitle: "ID로 친구를 찾아보세요", searchTitle: "사용자 검색", searchDesc: "사용자명 또는 표시 이름으로 검색하세요", placeholder: "예: alice", results: "검색 결과 ({count}명)", noResultsDesc: "다른 사용자명으로 검색해보세요", hintTitle: "친구를 찾아보세요", hintDesc: "사용자명을 입력하고 검색 버튼을 눌러보세요" },
   },
   compose: {
